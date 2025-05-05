@@ -12,6 +12,7 @@ members = [
     "StarShopContracts/loyalty-rewards-contract",
     "StarShopContracts/crowdfunding-collective",
     "StarShopContracts/multi-auction-contract",
+    "StarShopContracts/limited-time-drop",
 ]
 
 [workspace.dependencies]
