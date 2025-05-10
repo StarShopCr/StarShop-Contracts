@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{Address, Bytes, Env, Map, Symbol, Vec, contract, contractimpl};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Map, Symbol, Vec};
 
 mod distribution;
 mod eligibility;

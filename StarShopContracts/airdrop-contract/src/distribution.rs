@@ -1,7 +1,7 @@
 use crate::eligibility::check_eligibility;
 use crate::tracking::{has_claimed, mark_claimed};
 use crate::types::*;
-use soroban_sdk::{Address, Env, Symbol, Vec, token};
+use soroban_sdk::{token, Address, Env, Symbol, Vec};
 
 /// Transfer tokens from the contract to a user.
 pub fn transfer_tokens(

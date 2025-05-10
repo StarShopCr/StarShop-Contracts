@@ -97,7 +97,7 @@ impl ProductFollowContract {
         // For testing purposes, we don't require auth in tests
         #[cfg(not(test))]
         user.require_auth();
-        
+
         // Store the user in the system
         let users_key = DataKeys::AllUsers;
         let mut users: Vec<Address> = env
@@ -105,12 +105,12 @@ impl ProductFollowContract {
             .persistent()
             .get(&users_key)
             .unwrap_or_else(|| Vec::new(&env));
-            
+
         // Only add if not already registered
         if !users.contains(&user) {
             users.push_back(user.clone());
             env.storage().persistent().set(&users_key, &users);
-            
+
             // Initialize empty notification preferences with default values
             let preferences = NotificationPreferences {
                 user: user.clone(),
@@ -118,19 +118,17 @@ impl ProductFollowContract {
                 mute_notifications: false,
                 priority: datatype::NotificationPriority::Medium,
             };
-            
+
             <NotificationSystem as NotificationOperations>::set_notification_preferences(
                 env.clone(),
                 user.clone(),
                 preferences,
-            ).map_err(|_| Error::NotificationFailed)?;
-            
-            env.events().publish(
-                (symbol_short!("user_reg"),),
-                (user,),
-            );
+            )
+            .map_err(|_| Error::NotificationFailed)?;
+
+            env.events().publish((symbol_short!("user_reg"),), (user,));
         }
-        
+
         Ok(())
     }
 
@@ -213,33 +211,27 @@ impl ProductFollowContract {
 
     pub fn notify_price_change(env: Env, product_id: u32, new_price: u64) -> Result<(), Error> {
         // Log debug event
-        env.events().publish(
-            (symbol_short!("debug"),),
-            ("Notifying price change",),
-        );
-        
+        env.events()
+            .publish((symbol_short!("debug"),), ("Notifying price change",));
+
         <AlertSystem as AlertOperations>::check_price_change(env, product_id.into(), new_price)
             .map_err(|_| Error::NotificationFailed)
     }
 
     pub fn notify_restock(env: Env, product_id: u32) -> Result<(), Error> {
         // Log debug event
-        env.events().publish(
-            (symbol_short!("debug"),),
-            ("Notifying restock",),
-        );
-        
+        env.events()
+            .publish((symbol_short!("debug"),), ("Notifying restock",));
+
         <AlertSystem as AlertOperations>::check_restock(env, product_id.into())
             .map_err(|_| Error::NotificationFailed)
     }
 
     pub fn notify_special_offer(env: Env, product_id: u32) -> Result<(), Error> {
         // Log debug event
-        env.events().publish(
-            (symbol_short!("debug"),),
-            ("Notifying special offer",),
-        );
-        
+        env.events()
+            .publish((symbol_short!("debug"),), ("Notifying special offer",));
+
         <AlertSystem as AlertOperations>::check_special_offer(env, product_id.into())
             .map_err(|_| Error::NotificationFailed)
     }
@@ -278,9 +270,9 @@ impl ProductFollowContract {
             .persistent()
             .get(&all_users_key)
             .unwrap_or_else(|| Vec::new(&env));
-            
+
         let mut followers = Vec::new(&env);
-        
+
         // Check each user's follow list
         for user in all_users.iter() {
             let follow_key = DataKeys::FollowList(user.clone());
@@ -289,13 +281,13 @@ impl ProductFollowContract {
                 .persistent()
                 .get(&follow_key)
                 .unwrap_or_else(|| Vec::new(&env));
-                
+
             // If user follows this product, add to the list
             if follows.iter().any(|f| f.product_id == product_id) {
                 followers.push_back(user.clone());
             }
         }
-        
+
         followers
     }
 }

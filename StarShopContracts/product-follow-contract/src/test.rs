@@ -98,13 +98,13 @@ fn test_unfollow() {
 
     // Follow with the address we'll store for testing unfollow
     client.follow_product(&follower_address, &product_id, &categories);
-    
+
     // Add more followers
     for _ in 1..followers {
         let address = <Address>::generate(&env);
         client.follow_product(&address, &product_id, &categories);
     }
-    
+
     // Verify total followers
     env.as_contract(&contract_id, || {
         let key = DataKeys::FollowList(follower_address.clone());
@@ -157,10 +157,10 @@ fn test_notification_delivery_timing() {
             triggered_at: env.ledger().timestamp(),
             priority: NotificationPriority::Medium,
         };
-        
+
         let mut notifications = Vec::new(&env);
         notifications.push_back(notification);
-        
+
         env.storage().persistent().set(&history_key, &notifications);
     });
 
@@ -227,10 +227,10 @@ fn test_notification_priority_handling() {
             triggered_at: env.ledger().timestamp(),
             priority: NotificationPriority::High,
         };
-        
+
         let mut notifications = Vec::new(&env);
         notifications.push_back(notification);
-        
+
         env.storage().persistent().set(&history_key, &notifications);
     });
 
@@ -278,10 +278,10 @@ fn test_validate_notification_format() {
             triggered_at: env.ledger().timestamp(),
             priority: NotificationPriority::Medium,
         };
-        
+
         let mut notifications = Vec::new(&env);
         notifications.push_back(notification);
-        
+
         env.storage().persistent().set(&history_key, &notifications);
     });
 
@@ -329,25 +329,25 @@ fn test_verify_notification_history_tracking() {
     // For testing, directly create and store two notifications
     env.as_contract(&contract_id, || {
         let history_key = DataKeys::NotificationHistory(user_address.clone());
-        
+
         let notification1 = EventLog {
             product_id: product_id.into(),
             event_type: FollowCategory::PriceChange,
             triggered_at: env.ledger().timestamp(),
             priority: NotificationPriority::Medium,
         };
-        
+
         let notification2 = EventLog {
             product_id: product_id.into(),
             event_type: FollowCategory::PriceChange,
             triggered_at: env.ledger().timestamp() + 100,
             priority: NotificationPriority::High,
         };
-        
+
         let mut notifications = Vec::new(&env);
         notifications.push_back(notification1);
         notifications.push_back(notification2);
-        
+
         env.storage().persistent().set(&history_key, &notifications);
     });
 

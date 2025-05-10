@@ -62,7 +62,7 @@ impl AlertSystem {
     fn check_rate_limit(_env: &Env, _user: &Address) -> bool {
         #[cfg(test)]
         return true; // Disable rate limiting in tests
-        
+
         #[cfg(not(test))]
         {
             let last_notification = _env
@@ -70,7 +70,7 @@ impl AlertSystem {
                 .persistent()
                 .get::<_, u64>(&DataKeys::LastNotification(_user.clone()))
                 .unwrap_or(0);
-    
+
             let current_time = _env.ledger().timestamp();
             current_time - last_notification > 3600
         }
@@ -106,10 +106,14 @@ impl AlertSystem {
         Ok(())
     }
 
-    fn process_alert(env: &Env, product_id: u128, category: FollowCategory) -> Result<(), FollowError> {
+    fn process_alert(
+        env: &Env,
+        product_id: u128,
+        category: FollowCategory,
+    ) -> Result<(), FollowError> {
         // Get all users who follow this product
         let users = Self::get_users_following_product(env, product_id)?;
-        
+
         // Create an event for this alert
         let event = EventLog {
             product_id,
@@ -117,35 +121,39 @@ impl AlertSystem {
             triggered_at: env.ledger().timestamp(),
             priority: NotificationPriority::High,
         };
-        
+
         // Log the event for each user who follows this product with the right category
         for user_address in users.iter() {
             // Check user's notification preferences
             let prefs_key = DataKeys::AlertSettings(user_address.clone());
-            if let Some(prefs) = env.storage().persistent().get::<_, NotificationPreferences>(&prefs_key) {
+            if let Some(prefs) = env
+                .storage()
+                .persistent()
+                .get::<_, NotificationPreferences>(&prefs_key)
+            {
                 // Skip if notifications are muted
                 if prefs.mute_notifications {
                     continue;
                 }
-                
+
                 // Skip if user doesn't want notifications for this category
                 if !prefs.categories.contains(&category) {
                     continue;
                 }
             }
-            
+
             let follow_key = DataKeys::FollowList(user_address.clone());
             let follows: Vec<FollowData> = env
                 .storage()
                 .persistent()
                 .get(&follow_key)
                 .unwrap_or_else(|| Vec::new(env));
-                
+
             // Check if user is following for this category
-            if follows.iter().any(|f| {
-                u128::from(f.product_id) == product_id
-                    && f.categories.contains(&category)
-            }) {
+            if follows
+                .iter()
+                .any(|f| u128::from(f.product_id) == product_id && f.categories.contains(&category))
+            {
                 Self::log_event(env, user_address.clone(), event.clone())?;
             }
         }

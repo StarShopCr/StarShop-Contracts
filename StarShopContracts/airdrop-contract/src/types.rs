@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Bytes, Map, Symbol, contracterror, contracttype};
+use soroban_sdk::{contracterror, contracttype, Address, Bytes, Map, Symbol};
 
 /// Represents an airdrop event with dynamic eligibility conditions and constraints.
 #[contracttype]
