@@ -45,12 +45,7 @@ fn test_process_deposit_with_auth() {
     token.mint(&sender, &1000);
 
     // Execute transaction
-    client.process_deposit(
-        &token_contract_id.clone(),
-        &sender,
-        &recipient,
-        &100,
-    );
+    client.process_deposit(&token_contract_id.clone(), &sender, &recipient, &100);
 
     // Verify signed transactions
     assert_eq!(
@@ -228,7 +223,7 @@ fn test_process_refund_success() {
     let token_admin = Address::generate(&env);
     let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
     let token_contract_id = stellar_asset.address();
-    
+
     let token = TokenAdmin::new(&env, &token_contract_id);
 
     // Setup test accounts
@@ -260,7 +255,7 @@ fn test_process_refund_to_self() {
     let token_admin = Address::generate(&env);
     let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
     let token_contract_id = stellar_asset.address();
-    
+
     let token = TokenAdmin::new(&env, &token_contract_id);
 
     // Setup account
@@ -284,7 +279,7 @@ fn test_process_refund_insufficient_funds() {
     let token_admin = Address::generate(&env);
     let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
     let token_contract_id = stellar_asset.address();
-    
+
     let token = TokenAdmin::new(&env, &token_contract_id);
 
     // Setup accounts
@@ -309,7 +304,7 @@ fn test_process_refund_invalid_amount() {
     let token_admin = Address::generate(&env);
     let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
     let token_contract_id = stellar_asset.address();
-    
+
     let token = TokenAdmin::new(&env, &token_contract_id);
 
     // Setup test accounts

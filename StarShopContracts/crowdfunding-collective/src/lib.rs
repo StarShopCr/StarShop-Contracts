@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{Address, Env, String, Vec, contract, contractimpl};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
 mod funding;
 mod product;

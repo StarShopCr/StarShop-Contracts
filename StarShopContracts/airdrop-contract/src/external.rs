@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Symbol, contractclient, contracterror};
+use soroban_sdk::{contractclient, contracterror, Address, Symbol};
 
 /// Error codes for provider contracts.
 #[contracterror]

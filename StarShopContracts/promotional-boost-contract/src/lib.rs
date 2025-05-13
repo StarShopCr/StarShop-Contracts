@@ -55,8 +55,17 @@ impl PromotionBoostContract {
 
         // 4. Emit event for slot added
         env.events().publish(
-            (Symbol::new(&env, "boost_slot_added"), seller_address.clone()),
-            (slot_id, category.clone(), product_id, duration_secs, payment_amount),
+            (
+                Symbol::new(&env, "boost_slot_added"),
+                seller_address.clone(),
+            ),
+            (
+                slot_id,
+                category.clone(),
+                product_id,
+                duration_secs,
+                payment_amount,
+            ),
         );
 
         // 5. Refund the replaced seller if a slot was evicted
@@ -71,7 +80,10 @@ impl PromotionBoostContract {
 
                 // Emit event for replaced slot
                 env.events().publish(
-                    (Symbol::new(&env, "boost_slot_replaced"), replaced_slot.seller.clone()),
+                    (
+                        Symbol::new(&env, "boost_slot_replaced"),
+                        replaced_slot.seller.clone(),
+                    ),
                     (replaced_slot.product_id, replaced_slot.price_paid),
                 );
             }
@@ -94,7 +106,10 @@ impl PromotionBoostContract {
 
         // 8. Emit event for visibility change
         env.events().publish(
-            (Symbol::new(&env, "visibility_boosted"), seller_address_clone),
+            (
+                Symbol::new(&env, "visibility_boosted"),
+                seller_address_clone,
+            ),
             (product_id, category),
         );
     }
