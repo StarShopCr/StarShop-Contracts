@@ -12,6 +12,9 @@ pub use tracking::*;
 
 use types::{AirdropError, AirdropEvent, DataKey, EventStats};
 
+#[cfg(test)]
+mod test;
+
 #[contract]
 pub struct AirdropContract;
 
