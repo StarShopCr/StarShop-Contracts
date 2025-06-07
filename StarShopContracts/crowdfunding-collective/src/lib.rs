@@ -13,6 +13,9 @@ pub use rewards::*;
 pub use tracking::*;
 pub use types::*;
 
+#[cfg(test)]
+mod test;
+
 #[contract]
 pub struct CrowdfundingCollective;
 
