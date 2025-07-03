@@ -21,6 +21,7 @@ pub enum Error {
     AccountTooNew = 5,
     ProductNotFound = 6,
     ProductExists = 7,
+    InvalidInput = 8,
 }
 
 #[derive(Clone)]
