@@ -66,6 +66,10 @@ impl VoteManager {
             if now - existing_vote.timestamp > 24 * 60 * 60 {
                 return Err(Error::ReversalWindowExpired);
             }
+            // Added a check if user already voted to avoid multiple voting
+            if existing_vote.vote_type == vote_type {
+            return Err(Error::AlreadyVoted);
+    }
         }
 
         // Record vote
