@@ -21,7 +21,7 @@ impl RankingCalculator {
             .storage()
             .instance()
             .get(&symbol_short!("rankings"))
-            .unwrap();
+            .unwrap_or_else(|| Map::new(env));
         rankings.set(product_id, score);
         env.storage()
             .instance()
@@ -33,7 +33,7 @@ impl RankingCalculator {
             .storage()
             .instance()
             .get(&symbol_short!("rankings"))
-            .unwrap();
+            .unwrap_or_else(|| Map::new(env));
         rankings.get(product_id).unwrap_or(0)
     }
 
@@ -42,7 +42,7 @@ impl RankingCalculator {
             .storage()
             .instance()
             .get(&symbol_short!("rankings"))
-            .unwrap();
+            .unwrap_or_else(|| Map::new(env));
         let mut result = Vec::new(env);
 
         // Convert to vector of tuples
