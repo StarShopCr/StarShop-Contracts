@@ -14,21 +14,22 @@ use levels::LevelManager;
 use milestones::MilestoneManager;
 use points::PointsManager;
 use rewards::RewardManager;
-use types::{Error, LevelRequirements, LoyaltyLevel, Milestone, Reward, TransactionType};
+use types::{Error, LevelRequirements, LoyaltyLevel, Milestone, Reward};
 
 /// Main contract trait defining all available functions
 pub trait LoyaltyRewardsTrait {
     // Admin functions
     fn init(env: Env, admin: Address) -> Result<(), Error>;
+    fn update_admin(env: Env, new_admin: Address) -> Result<(), Error>;
     fn set_points_expiry(env: Env, days: u64) -> Result<(), Error>;
     fn set_max_redemption_percentage(env: Env, percentage_bps: u32) -> Result<(), Error>;
     fn set_points_ratio(env: Env, ratio: u32) -> Result<(), Error>;
     fn set_category_bonus(env: Env, category: Symbol, bonus_bps: u32) -> Result<(), Error>;
     fn set_product_bonus(env: Env, product_id: Symbol, bonus_bps: u32) -> Result<(), Error>;
+    fn add_points(env: Env, user: Address, amount: i128, description: Symbol) -> Result<(), Error>; // Admin-only manual adjustment
 
     // Points management
     fn register_user(env: Env, user: Address) -> Result<(), Error>;
-    fn add_points(env: Env, user: Address, amount: i128, description: Symbol) -> Result<(), Error>;
     fn get_points_balance(env: Env, user: Address) -> Result<i128, Error>;
     fn get_lifetime_points(env: Env, user: Address) -> Result<i128, Error>;
     fn record_purchase_points(
@@ -57,11 +58,10 @@ pub trait LoyaltyRewardsTrait {
         user: Address,
         reward_id: u32,
         purchase_amount: Option<i128>,
-    ) -> Result<(), Error>;
-    fn get_available_rewards(env: Env, user: Address) -> Result<Vec<Reward>, Error>;
+    ) -> Result<i128, Error>;
+    fn get_available_rewards(env: Env) -> Result<Vec<Reward>, Error>;
     fn calculate_discount(
         env: Env,
-        user: Address,
         reward_id: u32,
         purchase_amount: i128,
     ) -> Result<i128, Error>;
@@ -72,9 +72,13 @@ pub struct LoyaltyRewards;
 
 #[contractimpl]
 impl LoyaltyRewardsTrait for LoyaltyRewards {
-    // Admin functions
+    // --- Admin functions ---
     fn init(env: Env, admin: Address) -> Result<(), Error> {
         AdminModule::init(&env, &admin)
+    }
+
+    fn update_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        AdminModule::update_admin(&env, &new_admin)
     }
 
     fn set_points_expiry(env: Env, days: u64) -> Result<(), Error> {
@@ -96,14 +100,16 @@ impl LoyaltyRewardsTrait for LoyaltyRewards {
     fn set_product_bonus(env: Env, product_id: Symbol, bonus_bps: u32) -> Result<(), Error> {
         AdminModule::set_product_bonus(&env, &product_id, bonus_bps)
     }
+    
+    // Admin-only manual point adjustment
+    fn add_points(env: Env, user: Address, amount: i128, description: Symbol) -> Result<(), Error> {
+        AdminModule::verify_admin(&env)?;
+        PointsManager::add_points(&env, &user, amount, description, types::TransactionType::Bonus, None, None)
+    }
 
     // Points management
     fn register_user(env: Env, user: Address) -> Result<(), Error> {
         PointsManager::register_user(&env, &user)
-    }
-
-    fn add_points(env: Env, user: Address, amount: i128, description: Symbol) -> Result<(), Error> {
-        PointsManager::add_points(&env, &user, amount, description, TransactionType::Earned)
     }
 
     fn get_points_balance(env: Env, user: Address) -> Result<i128, Error> {
@@ -164,20 +170,19 @@ impl LoyaltyRewardsTrait for LoyaltyRewards {
         user: Address,
         reward_id: u32,
         purchase_amount: Option<i128>,
-    ) -> Result<(), Error> {
+    ) -> Result<i128, Error> {
         RewardManager::redeem_reward(&env, &user, reward_id, purchase_amount)
     }
 
-    fn get_available_rewards(env: Env, user: Address) -> Result<Vec<Reward>, Error> {
-        RewardManager::get_available_rewards(&env, &user)
+    fn get_available_rewards(env: Env) -> Result<Vec<Reward>, Error> {
+        RewardManager::get_available_rewards(&env)
     }
 
     fn calculate_discount(
         env: Env,
-        user: Address,
         reward_id: u32,
         purchase_amount: i128,
     ) -> Result<i128, Error> {
-        RewardManager::calculate_discount(&env, &user, reward_id, purchase_amount)
+        RewardManager::calculate_discount(&env, reward_id, purchase_amount)
     }
 }

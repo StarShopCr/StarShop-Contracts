@@ -32,6 +32,11 @@ impl AdminModule {
             .instance()
             .set(&DataKey::PointsPerPurchaseRatio, &default_points_ratio);
 
+        // Initialize counters
+        env.storage().instance().set(&DataKey::TotalMilestones, &0u32);
+        env.storage().instance().set(&DataKey::TotalRewards, &0u32);
+
+
         // Publish contract initialization event
         env.events().publish(
             (Symbol::new(env, "contract_initialized"),),

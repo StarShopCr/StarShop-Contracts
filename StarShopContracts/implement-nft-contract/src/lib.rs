@@ -44,6 +44,24 @@ impl NFTContract {
             panic!("Unauthorized");
         }
     }
+
+    pub fn verify_admin(env: Env, caller: Address) {
+        let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap_or_else(|| {
+            panic!("Contract not initialized");
+        });
+        
+        if caller != admin {
+            panic!("Unauthorized: Only admin can perform this action");
+        }
+    }
+
+    pub fn get_admin(env: Env) -> Address {
+        env.storage().instance().get(&ADMIN_KEY).unwrap()
+    }
+
+    pub fn is_initialized(env: Env) -> bool {
+        env.storage().instance().has(&ADMIN_KEY)
+    }
 }
 
 #[cfg(test)]

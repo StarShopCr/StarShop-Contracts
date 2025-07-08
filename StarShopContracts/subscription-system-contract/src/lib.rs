@@ -7,6 +7,9 @@ mod minting;
 mod expiration;
 mod access;
 
+#[cfg(test)]
+mod test;
+
 use crate::plans::{
     create_plan, get_plan, update_plan, disable_plan, Plan,
 };

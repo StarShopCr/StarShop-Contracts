@@ -7,13 +7,19 @@ pub struct MilestoneManager;
 impl MilestoneManager {
     /// Create a new milestone
     pub fn create_milestone(env: &Env, milestone: Milestone) -> Result<(), Error> {
-        // Check if admin
         crate::admin::AdminModule::verify_admin(env)?;
 
-        // Store the milestone
+        let mut total_milestones: u32 = env.storage().instance().get(&DataKey::TotalMilestones).unwrap_or(0);
+        
+        // Use the counter as the ID
+        let new_milestone = Milestone { id: total_milestones, ..milestone };
+
         env.storage()
             .instance()
-            .set(&DataKey::Milestone(milestone.id), &milestone);
+            .set(&DataKey::Milestone(new_milestone.id), &new_milestone);
+        
+        total_milestones += 1;
+        env.storage().instance().set(&DataKey::TotalMilestones, &total_milestones);
 
         Ok(())
     }
@@ -38,39 +44,32 @@ impl MilestoneManager {
     /// Check if user meets milestone requirements
     pub fn check_milestone_eligibility(
         env: &Env,
-        user: &Address,
-        milestone_id: u32,
+        user_data: &UserData,
+        milestone: &Milestone,
     ) -> Result<bool, Error> {
-        // Get user data
-        let user_data = PointsManager::get_user_data(env, user)?;
-
-        // Get milestone
-        let milestone = Self::get_milestone(env, milestone_id)?;
-
-        // Check if already completed
-        if Self::has_completed_milestone(env, user, milestone_id) {
+        if user_data.completed_milestones.contains(&milestone.id) {
             return Err(Error::MilestoneAlreadyCompleted);
         }
 
-        // Check requirements
-        let meets_requirement = match milestone.requirement {
+        let ratio = crate::admin::AdminModule::get_points_ratio(env);
+
+        let meets_requirement = match &milestone.requirement {
             MilestoneRequirement::TotalPurchases(required) => {
-                Self::count_purchases(&user_data) >= required
+                Self::count_purchases(user_data) >= *required
             }
             MilestoneRequirement::SpendAmount(required) => {
-                Self::calculate_total_spend(&user_data) >= required
+                Self::calculate_total_spend(user_data, ratio) >= *required
             }
-            MilestoneRequirement::PointsEarned(required) => user_data.lifetime_points >= required,
+            MilestoneRequirement::PointsEarned(required) => user_data.lifetime_points >= *required,
             MilestoneRequirement::SpecificProduct(product_id) => {
-                Self::has_purchased_product(&user_data, &product_id)
+                Self::has_purchased_product(user_data, product_id)
             }
             MilestoneRequirement::SpecificCategory(category) => {
-                Self::has_purchased_category(&user_data, &category)
+                Self::has_purchased_category(user_data, category)
             }
             MilestoneRequirement::DaysActive(required) => {
-                let current_time = env.ledger().timestamp();
-                let days_active = (current_time - user_data.join_date) / (24 * 60 * 60);
-                days_active >= required
+                let days_active = (env.ledger().timestamp() - user_data.join_date) / (24 * 60 * 60);
+                days_active >= *required
             }
         };
 
@@ -79,131 +78,90 @@ impl MilestoneManager {
 
     /// Complete a milestone and award points
     pub fn complete_milestone(env: &Env, user: &Address, milestone_id: u32) -> Result<i128, Error> {
-        // Check eligibility
-        if !Self::check_milestone_eligibility(env, user, milestone_id)? {
-            return Err(Error::MilestoneNotFound);
-        }
-
-        // Get milestone
+        let user_data = PointsManager::get_user_data(env, user)?;
         let milestone = Self::get_milestone(env, milestone_id)?;
 
-        // Clone the name for later use in the event
-        let milestone_name = milestone.name.clone();
+        if !Self::check_milestone_eligibility(env, &user_data, &milestone)? {
+            return Err(Error::MilestoneNotEligible);
+        }
 
-        // Award points
+        let milestone_name = milestone.name.clone();
+        let points_reward = milestone.points_reward;
+        
         PointsManager::add_points(
             env,
             user,
-            milestone.points_reward,
+            points_reward,
             milestone_name.clone(),
             TransactionType::Bonus,
+            None,
+            None
         )?;
 
-        // Update user's completed milestones
-        let mut user_data = PointsManager::get_user_data(env, user)?;
-        user_data.completed_milestones.push_back(milestone_id);
-
-        // Save updated user data
+        // Re-fetch user_data after it was modified by add_points
+        let mut updated_user_data = PointsManager::get_user_data(env, user)?;
+        
+        updated_user_data.completed_milestones.push_back(milestone_id);
         env.storage()
             .persistent()
-            .set(&DataKey::User(user.clone()), &user_data);
+            .set(&DataKey::User(user.clone()), &updated_user_data);
 
-        // Publish milestone completion event
         env.events().publish(
             (Symbol::new(env, "milestone_completed"), user.clone()),
-            ((
-                milestone_id,
-                milestone_name,
-                milestone.points_reward,
-                env.ledger().timestamp(),
-            ),),
+            ((milestone_id, milestone_name, points_reward, env.ledger().timestamp()),),
         );
 
-        Ok(milestone.points_reward)
+        Ok(points_reward)
     }
 
     /// Check all milestones for a user and complete eligible ones
     pub fn check_and_complete_milestones(env: &Env, user: &Address) -> Result<Vec<u32>, Error> {
         let mut completed = Vec::new(env);
-        let mut milestone_id = 0;
+        let total_milestones: u32 = env.storage().instance().get(&DataKey::TotalMilestones).unwrap_or(0);
 
-        // Iterate through all milestones
-        while env
-            .storage()
-            .instance()
-            .has(&DataKey::Milestone(milestone_id))
-        {
-            // Try to complete milestone if eligible
-            if !Self::has_completed_milestone(env, user, milestone_id) {
-                if let Ok(true) = Self::check_milestone_eligibility(env, user, milestone_id) {
-                    if let Ok(_) = Self::complete_milestone(env, user, milestone_id) {
-                        completed.push_back(milestone_id);
+        for milestone_id in 0..total_milestones {
+            let user_data = PointsManager::get_user_data(env, user)?;
+            if let Ok(milestone) = Self::get_milestone(env, milestone_id) {
+                if !user_data.completed_milestones.contains(&milestone_id) {
+                    if let Ok(true) = Self::check_milestone_eligibility(env, &user_data, &milestone) {
+                         if Self::complete_milestone(env, user, milestone_id).is_ok() {
+                            completed.push_back(milestone_id);
+                        }
                     }
                 }
             }
-
-            milestone_id += 1;
         }
-
         Ok(completed)
     }
 
-    /// Helper: Count total purchases from transaction history
+    // Helper Functions
+
     pub fn count_purchases(user_data: &UserData) -> u32 {
-        let mut count = 0;
-
-        for transaction in user_data.transactions.iter() {
-            if transaction.transaction_type == TransactionType::Earned
-                && transaction.description == symbol_short!("purchase")
-            {
-                count += 1;
-            }
-        }
-
-        count
+        user_data.transactions.iter().filter(|tx| 
+            tx.transaction_type == TransactionType::Earned && tx.description == symbol_short!("purchase")
+        ).count() as u32
     }
 
-    /// Helper: Calculate total spend from transaction history
-    /// This is an approximation based on points earned from purchases
-    fn calculate_total_spend(user_data: &UserData) -> i128 {
-        let mut total = 0;
-
-        for transaction in user_data.transactions.iter() {
-            if transaction.transaction_type == TransactionType::Earned
-                && transaction.description == symbol_short!("purchase")
-            {
-                // Assuming points ratio is stored elsewhere, we use a simple approximation here
-                // In a real implementation, you might want to store the actual purchase amount
-                total += transaction.amount * 100; // Assuming 1 point = 100 currency units
+    fn calculate_total_spend(user_data: &UserData, points_ratio: u32) -> i128 {
+        let mut total_points_from_purchase = 0;
+        for tx in user_data.transactions.iter() {
+            if tx.transaction_type == TransactionType::Earned && tx.description == symbol_short!("purchase") {
+                total_points_from_purchase += tx.amount;
             }
         }
-
-        total
+        // Approximate spend based on points earned and the base ratio
+        total_points_from_purchase * (points_ratio as i128)
     }
 
-    /// Helper: Check if user has purchased a specific product
     fn has_purchased_product(user_data: &UserData, product_id: &Symbol) -> bool {
-        for transaction in user_data.transactions.iter() {
-            if transaction.transaction_type == TransactionType::Earned
-                && transaction.description == *product_id
-            {
-                return true;
-            }
-        }
-
-        false
+        user_data.transactions.iter().any(|tx| {
+            tx.transaction_type == TransactionType::Earned && tx.product_id.as_ref() == Some(product_id)
+        })
     }
 
-    /// Helper: Check if user has purchased from a specific category
     fn has_purchased_category(user_data: &UserData, category: &Symbol) -> bool {
-        for transaction in user_data.transactions.iter() {
-            if transaction.transaction_type == TransactionType::Earned
-                && transaction.description == *category
-            {
-                return true;
-            }
-        }
-
-        false
+        user_data.transactions.iter().any(|tx| {
+            tx.transaction_type == TransactionType::Earned && tx.category.as_ref() == Some(category)
+        })
     }
 }

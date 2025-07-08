@@ -1,20 +1,24 @@
 use crate::points::PointsManager;
-use crate::types::{DataKey, Error, Reward, RewardType};
+use crate::types::{DataKey, Error, Reward, RewardType, UserRedemption};
 use soroban_sdk::token::Client as TokenClient;
 use soroban_sdk::{Address, Env, Symbol, Vec};
 
 pub struct RewardManager;
 
 impl RewardManager {
-    /// Create a new reward
+    /// Create a new reward, managed by a central counter
     pub fn create_reward(env: &Env, reward: Reward) -> Result<(), Error> {
-        // Check if admin
         crate::admin::AdminModule::verify_admin(env)?;
 
-        // Store the reward
+        let mut total_rewards: u32 = env.storage().instance().get(&DataKey::TotalRewards).unwrap_or(0);
+        let new_reward = Reward { id: total_rewards, ..reward };
+
         env.storage()
             .instance()
-            .set(&DataKey::Reward(reward.id), &reward);
+            .set(&DataKey::Reward(new_reward.id), &new_reward);
+
+        total_rewards += 1;
+        env.storage().instance().set(&DataKey::TotalRewards, &total_rewards);
 
         Ok(())
     }
@@ -27,7 +31,7 @@ impl RewardManager {
             .ok_or(Error::RewardNotFound)
     }
 
-    /// Check if user is eligible for a reward
+    /// Check if a user is eligible for a reward
     pub fn check_reward_eligibility(
         env: &Env,
         user: &Address,
@@ -36,203 +40,121 @@ impl RewardManager {
         let user_data = PointsManager::get_user_data(env, user)?;
         let reward = Self::get_reward(env, reward_id)?;
 
-        // Check if user has enough points
-        if user_data.current_points < reward.points_cost {
+        let balance = PointsManager::get_points_balance(env, user)?;
+        if balance < reward.points_cost {
             return Ok(false);
         }
 
-        // Check if user has required loyalty level
         if user_data.level < reward.min_level {
             return Ok(false);
         }
 
+        // Check redemption limit
+        let redemption_key = UserRedemption(user.clone(), reward_id);
+        let user_redemptions: u32 = env.storage().persistent().get(&redemption_key).unwrap_or(0);
+        
+        if reward.max_per_user > 0 && user_redemptions >= reward.max_per_user {
+            return Err(Error::RewardLimitReached);
+        }
+        
         Ok(true)
     }
 
-    /// Redeem a reward
+    /// Redeem a reward, returning the value of the reward (e.g., discount amount)
     pub fn redeem_reward(
         env: &Env,
         user: &Address,
         reward_id: u32,
         purchase_amount: Option<i128>,
-    ) -> Result<(), Error> {
-        // Authenticate user
+    ) -> Result<i128, Error> {
         user.require_auth();
 
-        // Check eligibility
         if !Self::check_reward_eligibility(env, user, reward_id)? {
-            return Err(Error::InsufficientPoints);
+            return Err(Error::InsufficientPoints); // Or other error from check
         }
 
         let reward = Self::get_reward(env, reward_id)?;
+        let mut reward_value = 0i128;
 
-        // For discount rewards, ensure purchase amount is provided
-        if let RewardType::Discount(_) = reward.reward_type {
-            if purchase_amount.is_none() {
-                return Err(Error::InvalidAmount);
+        // Process the reward based on its type
+        match reward.reward_type.clone() {
+            RewardType::Discount(discount_bps) => {
+                let amount = purchase_amount.ok_or(Error::InvalidAmount)?;
+                let discount = Self::calculate_discount_internal(env, amount, discount_bps)?;
+                reward_value = discount;
+            }
+            RewardType::Product(_) => {
+                reward_value = 1; // Represents 1 product
+            }
+            RewardType::XLM(amount) | RewardType::Token(_, amount) => {
+                reward_value = amount;
             }
         }
+        
+        // Deduct points
+        PointsManager::spend_points(env, user, reward.points_cost, reward.name.clone())?;
 
-        // Handle maximum redemption percentage for discounts
-        let mut discount_value: Option<i128> = None;
-        if let RewardType::Discount(discount_bps) = reward.reward_type {
-            if let Some(amount) = purchase_amount {
-                let max_redemption_bps = env
-                    .storage()
-                    .instance()
-                    .get::<_, u32>(&DataKey::MaxRedemptionPercentage)
-                    .unwrap_or(5000); // Default to 50% if not set
+        // Update redemption count for the user
+        let redemption_key = UserRedemption(user.clone(), reward_id);
+        let mut user_redemptions: u32 = env.storage().persistent().get(&redemption_key).unwrap_or(0);
+        user_redemptions += 1;
+        env.storage().persistent().set(&redemption_key, &user_redemptions);
 
-                // Calculate discount value
-                let calc_discount = (amount * discount_bps as i128) / 10000;
 
-                // Check if discount exceeds maximum allowed
-                let max_allowed_discount = (amount * max_redemption_bps as i128) / 10000;
-
-                if calc_discount > max_allowed_discount {
-                    return Err(Error::MaxRedemptionExceeded);
-                }
-
-                discount_value = Some(calc_discount);
-            }
-        }
-
-        // Create reward claim data for event
-        let claim_data = (
-            reward.id,
-            reward.name.clone(),
-            reward.points_cost,
-            env.ledger().timestamp(),
-        );
-
-        // Process the reward based on type
+        // Handle token/XLM transfers
         match reward.reward_type {
-            RewardType::Discount(_) => {
-                // Discount is handled at point of sale, just deduct points
-                PointsManager::spend_points(
-                    env,
-                    user,
-                    reward.points_cost,
-                    Symbol::new(env, "discount_reward"),
-                )?;
-
-                // Publish discount reward event with discount value
-                env.events().publish(
-                    (Symbol::new(env, "reward_claimed"), user.clone()),
-                    ((claim_data, "discount", discount_value),),
-                );
-            }
-            RewardType::Product(product_id) => {
-                // Product reward, deduct points
-                PointsManager::spend_points(
-                    env,
-                    user,
-                    reward.points_cost,
-                    Symbol::new(env, "product_reward"),
-                )?;
-
-                // Publish product reward event
-                env.events().publish(
-                    (Symbol::new(env, "reward_claimed"), user.clone()),
-                    ((claim_data, "product", product_id),),
-                );
-
-                // In a real implementation, you would integrate with inventory system
-                // to mark the product as redeemed for the user
-            }
-            RewardType::XLM(amount) => {
-                // XLM reward, deduct points and transfer XLM
-                PointsManager::spend_points(
-                    env,
-                    user,
-                    reward.points_cost,
-                    Symbol::new(env, "xlm_reward"),
-                )?;
-
-                // Publish XLM reward event
-                env.events().publish(
-                    (Symbol::new(env, "reward_claimed"), user.clone()),
-                    ((claim_data, "xlm", amount),),
-                );
-
-                // Transfer XLM to user
-                // This would require integration with Stellar's native asset
-                // In a real implementation, you would use the Stellar SDK
-            }
             RewardType::Token(token_address, amount) => {
-                // Token reward, deduct points and transfer tokens
-                PointsManager::spend_points(
-                    env,
-                    user,
-                    reward.points_cost,
-                    Symbol::new(env, "token_reward"),
-                )?;
-
-                // Transfer tokens to user
                 let token = TokenClient::new(env, &token_address);
                 token.transfer(&env.current_contract_address(), user, &amount);
-
-                // Publish token reward event
-                env.events().publish(
-                    (Symbol::new(env, "reward_claimed"), user.clone()),
-                    ((claim_data, "token", (token_address, amount)),),
-                );
             }
+            RewardType::XLM(_) => {
+                // NOTE: Native XLM transfers are not directly supported in vanilla Soroban contracts.
+                // This requires a separate contract call to an XLM wrapper or a host function invocation.
+                // This part of the logic is a placeholder for that integration.
+            }
+            _ => {} // Discount and Product rewards are handled off-chain
         }
+        
+        env.events().publish(
+            (Symbol::new(env, "reward_claimed"), user.clone()),
+            ((reward.id, reward.name, reward.points_cost, env.ledger().timestamp()),),
+        );
+        
+        Ok(reward_value)
+    }
 
-        Ok(())
+    fn calculate_discount_internal(env: &Env, purchase_amount: i128, discount_bps: u32) -> Result<i128, Error> {
+        let max_redemption_bps = crate::admin::AdminModule::get_max_redemption_percentage(env);
+        let discount_value = (purchase_amount * discount_bps as i128) / 10000;
+        let max_allowed_discount = (purchase_amount * max_redemption_bps as i128) / 10000;
+
+        Ok(discount_value.min(max_allowed_discount))
     }
 
     /// Calculate discount amount for a purchase
     pub fn calculate_discount(
         env: &Env,
-        _user: &Address,
         reward_id: u32,
         purchase_amount: i128,
     ) -> Result<i128, Error> {
         let reward = Self::get_reward(env, reward_id)?;
 
-        // Ensure reward is a discount type
         if let RewardType::Discount(discount_bps) = reward.reward_type {
-            // Calculate discount value
-            let discount_value = (purchase_amount * discount_bps as i128) / 10000;
-
-            // Check maximum redemption percentage
-            let max_redemption_bps = env
-                .storage()
-                .instance()
-                .get::<_, u32>(&DataKey::MaxRedemptionPercentage)
-                .unwrap_or(5000); // Default to 50% if not set
-
-            let max_allowed_discount = (purchase_amount * max_redemption_bps as i128) / 10000;
-
-            // Return the lower of the two values
-            if discount_value > max_allowed_discount {
-                Ok(max_allowed_discount)
-            } else {
-                Ok(discount_value)
-            }
+            Self::calculate_discount_internal(env, purchase_amount, discount_bps)
         } else {
-            Err(Error::RewardNotFound)
+            Err(Error::RewardNotFound) // Not a discount reward
         }
     }
 
-    /// Get available rewards for a user based on their level
-    pub fn get_available_rewards(env: &Env, user: &Address) -> Result<Vec<Reward>, Error> {
-        let user_data = PointsManager::get_user_data(env, user)?;
+    /// Get all available rewards in the system
+    pub fn get_available_rewards(env: &Env) -> Result<Vec<Reward>, Error> {
         let mut rewards = Vec::new(env);
-        let mut reward_id = 0;
+        let total_rewards: u32 = env.storage().instance().get(&DataKey::TotalRewards).unwrap_or(0);
 
-        // Iterate through all rewards
-        while env.storage().instance().has(&DataKey::Reward(reward_id)) {
-            let reward = Self::get_reward(env, reward_id)?;
-
-            // Include reward if user level is sufficient
-            if user_data.level >= reward.min_level {
+        for reward_id in 0..total_rewards {
+            if let Ok(reward) = Self::get_reward(env, reward_id) {
                 rewards.push_back(reward);
             }
-
-            reward_id += 1;
         }
 
         Ok(rewards)

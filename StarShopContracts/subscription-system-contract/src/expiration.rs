@@ -36,6 +36,7 @@ pub fn cleanup_expired(env: &Env, user: Address, plan_id: Symbol) -> bool {
 }
 
 /// Optional: Check exact state of a subscription lifecycle
+#[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub enum SubscriptionState {
     Active,
