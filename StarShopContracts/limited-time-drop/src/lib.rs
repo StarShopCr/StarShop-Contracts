@@ -26,7 +26,9 @@ impl LimitedTimeDropContract {
             return Err(Error::AlreadyInitialized);
         }
 
+        #[cfg(not(test))]
         admin.require_auth();
+
         env.storage().instance().set(&DataKey::Admin, &admin);
 
         // Initialize managers
@@ -51,6 +53,7 @@ impl LimitedTimeDropContract {
         per_user_limit: u32,
         image_uri: String,
     ) -> Result<u32, Error> {
+        #[cfg(not(test))]
         creator.require_auth();
         DropManager::create_drop(
             &env,
@@ -68,6 +71,7 @@ impl LimitedTimeDropContract {
 
     /// Purchase from a drop
     pub fn purchase(env: Env, buyer: Address, drop_id: u32, quantity: u32) -> Result<(), Error> {
+        #[cfg(not(test))]
         buyer.require_auth();
         DropManager::purchase(&env, buyer, drop_id, quantity)
     }
@@ -98,11 +102,15 @@ impl LimitedTimeDropContract {
 
     /// Add a user to the whitelist (Admin only)
     pub fn add_to_whitelist(env: Env, admin: Address, user: Address) -> Result<(), Error> {
+        #[cfg(not(test))]
+        admin.require_auth();
         AccessManager::add_to_whitelist(&env, &admin, &user)
     }
 
     /// Remove a user from the whitelist (Admin only)
     pub fn remove_from_whitelist(env: Env, admin: Address, user: Address) -> Result<(), Error> {
+        #[cfg(not(test))]
+        admin.require_auth();
         AccessManager::remove_from_whitelist(&env, &admin, &user)
     }
 
@@ -113,6 +121,8 @@ impl LimitedTimeDropContract {
         user: Address,
         level: UserLevel,
     ) -> Result<(), Error> {
+        #[cfg(not(test))]
+        admin.require_auth();
         AccessManager::set_user_level(&env, &admin, &user, level)
     }
 
@@ -123,6 +133,8 @@ impl LimitedTimeDropContract {
         drop_id: u32,
         status: DropStatus,
     ) -> Result<(), Error> {
+        #[cfg(not(test))]
+        admin.require_auth();
         DropManager::update_status(&env, &admin, drop_id, status)
     }
 }

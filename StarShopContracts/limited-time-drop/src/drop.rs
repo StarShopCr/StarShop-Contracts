@@ -38,6 +38,15 @@ impl DropManager {
             return Err(Error::InvalidPrice);
         }
 
+        // Validate supply and limits
+        if max_supply == 0 {
+            return Err(Error::InsufficientSupply);
+        }
+
+        if per_user_limit == 0 {
+            return Err(Error::InvalidQuantity);
+        }
+
         // Get next drop ID
         let drop_count: u32 = env
             .storage()
@@ -108,7 +117,8 @@ impl DropManager {
         drop_id: u32,
         status: DropStatus,
     ) -> Result<(), Error> {
-        // Verify admin
+        // Verify admin authentication and authorization
+
         let contract_admin: Address = env
             .storage()
             .instance()
@@ -120,8 +130,24 @@ impl DropManager {
         }
 
         let mut drop: Drop = Self::get_drop(env, drop_id)?;
-        drop.status = status;
+
+        // Validate status transition
+        match (drop.status, status) {
+            (DropStatus::Pending, DropStatus::Active) => (),
+            (DropStatus::Active, DropStatus::Completed)
+            | (DropStatus::Active, DropStatus::Cancelled) => (),
+            _ => return Err(Error::InvalidStatusTransition),
+        }
+
+        drop.status = status.clone();
         env.storage().instance().set(&DataKey::Drop(drop_id), &drop);
+
+        // Emit status update event
+        env.events().publish(
+            (Symbol::new(env, "status_update"), admin.clone()),
+            (drop_id, status),
+        );
+
         Ok(())
     }
 
@@ -155,6 +181,11 @@ impl DropManager {
 
     /// Process a purchase
     pub fn purchase(env: &Env, buyer: Address, drop_id: u32, quantity: u32) -> Result<(), Error> {
+        // Validate quantity
+        if quantity == 0 {
+            return Err(Error::InvalidQuantity);
+        }
+
         // Verify purchase access (whitelist and user level)
         AccessManager::verify_purchase_access(env, &buyer)?;
 
@@ -168,6 +199,11 @@ impl DropManager {
 
         // Check supply
         if drop.max_supply == 0 {
+            return Err(Error::InsufficientSupply);
+        }
+
+        // Check if total purchases would exceed max supply
+        if drop.total_purchased + quantity > drop.max_supply {
             return Err(Error::InsufficientSupply);
         }
 
