@@ -26,6 +26,7 @@ pub enum Error {
     NotInitialized = 10,
     AdminOnly = 11,
     InvalidAdmin = 12,
+    AlreadyInitialized = 13,
 }
 
 // SECURITY FIX: Enhanced Product struct with audit trail

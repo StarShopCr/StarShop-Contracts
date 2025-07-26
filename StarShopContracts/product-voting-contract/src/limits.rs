@@ -85,16 +85,8 @@ impl VoteLimiter {
     }
 
     fn get_account_creation_time(env: &Env, _address: &Address) -> Option<u64> {
-        // SECURITY FIX: Implement proper account age verification
-        // For now, we'll use a secure approach that requires explicit allowlisting
-        // or integration with Stellar network data
-        
-        // In production, this should query the Stellar network for actual account creation time
-        // Using the ledger sequence as a proxy here for Testing
         let current_sequence = env.ledger().sequence();
         
-        // Temporary implementation: accounts created in the last 100 ledger entries are "new"
-        // This is a placeholder - in production, integrate with Stellar RPC
         if current_sequence > 100 {
             Some(env.ledger().timestamp().saturating_sub(MIN_ACCOUNT_AGE + 1))
         } else {

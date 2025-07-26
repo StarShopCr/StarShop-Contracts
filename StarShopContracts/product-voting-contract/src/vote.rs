@@ -20,19 +20,25 @@ impl VoteManager {
     }
 
     // AUTHORIZATION: Initialize admin
-    pub fn init_admin(env: &Env, admin: Address, max_products_per_user: u32) -> Result<(), Error> {
+    pub fn init_admin(
+        env: &Env,
+        admin: Address,
+        max_products_per_user: u32,
+        voting_period_days: u32,
+        reversal_window_hours: u32
+        )-> Result<(), Error> {
         admin.require_auth();
         
         if env.storage().instance().has(&DataKey::Admin) {
-            return Err(Error::AlreadyVoted); // Reusing error for "already initialized"
+            return Err(Error::AlreadyInitialized);
         }
 
         let admin_config = AdminConfig {
             admin,
             initialized: true,
             max_products_per_user,
-            voting_period_days: 30,
-            reversal_window_hours: 24,
+            voting_period_days,
+            reversal_window_hours,
         };
 
         env.storage().instance().set(&DataKey::Admin, &admin_config);
