@@ -950,6 +950,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "promotion-nft-contract"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "promotional-boost-contract"
 version = "0.0.0"
 dependencies = [
