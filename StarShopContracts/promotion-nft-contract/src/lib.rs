@@ -5,7 +5,6 @@ pub mod mint;
 pub mod redeem;
 pub mod roles;
 pub mod storage;
-pub mod test;
 
 use soroban_sdk::{Address, Env, String, Symbol, contract, contractimpl, panic_with_error};
 use stellar_macros::default_impl;
@@ -22,13 +21,20 @@ impl StarshopPromoNFT {
     }
 
     /// Mint a new promotional NFT with optional metadata
-    pub fn mint_promo(env: Env, recipient: Address, metadata_uri: Option<String>) -> u32 {
-        mint::mint_promo(&env, &recipient, metadata_uri)
+    pub fn mint_promo(
+        env: Env,
+        caller: Address,
+        recipient: Address,
+        metadata_uri: Option<String>,
+    ) -> u32 {
+        caller.require_auth();
+        mint::mint_promo(&env, &caller, &recipient, metadata_uri)
     }
 
     /// Redeem a promotional NFT
-    pub fn redeem(env: Env, token_id: u32) {
-        redeem::redeem_token(&env, token_id);
+    pub fn redeem(env: Env, caller: Address, token_id: u32) {
+        caller.require_auth();
+        redeem::redeem_token(&env, &caller, token_id);
     }
 
     /// Check if an NFT has been redeemed
@@ -42,13 +48,15 @@ impl StarshopPromoNFT {
     }
 
     /// Grant role to an address
-    pub fn grant_role(env: Env, role: Symbol, account: Address) {
-        roles::grant_role(&env, role, &account);
+    pub fn grant_role(env: Env, role: Symbol, account: Address, admin: Address) {
+        admin.require_auth();
+        roles::grant_role(&env, role, &account, &admin);
     }
 
     /// Revoke role from an address
-    pub fn revoke_role(env: Env, role: Symbol, account: Address) {
-        roles::revoke_role(&env, role, &account);
+    pub fn revoke_role(env: Env, role: Symbol, account: Address, admin: Address) {
+        admin.require_auth();
+        roles::revoke_role(&env, role, &account, &admin);
     }
 
     /// Check if address has role

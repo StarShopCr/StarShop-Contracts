@@ -5,9 +5,8 @@ pub const DEFAULT_ADMIN_ROLE: u32 = 0;
 pub const MINTER_ROLE: u32 = 1;
 pub const REDEEMER_ROLE: u32 = 2;
 
-pub fn require_role(env: &Env, role: Symbol) {
-    let caller = env.current_contract_address();
-    if !has_role(env, role, &caller) {
+pub fn require_role(env: &Env, account: &Address, role: Symbol) {
+    if !has_role(env, role, account) {
         panic_with_error!(env, storage::ContractError::MissingRole);
     }
 }
@@ -17,9 +16,9 @@ pub fn has_role(env: &Env, role: Symbol, account: &Address) -> bool {
     env.storage().persistent().get(&role_key).unwrap_or(false)
 }
 
-pub fn grant_role(env: &Env, role: Symbol, account: &Address) {
+pub fn grant_role(env: &Env, role: Symbol, account: &Address, admin: &Address) {
     // Only admin can grant roles
-    require_role(env, storage::DEFAULT_ADMIN_ROLE);
+    require_role(env, admin, storage::DEFAULT_ADMIN_ROLE);
 
     let role_key = (role.clone(), account.clone());
     env.storage().persistent().set(&role_key, &true);
@@ -28,9 +27,9 @@ pub fn grant_role(env: &Env, role: Symbol, account: &Address) {
         .publish((storage::ROLE_GRANTED_EVENT,), (role, account.clone()));
 }
 
-pub fn revoke_role(env: &Env, role: Symbol, account: &Address) {
+pub fn revoke_role(env: &Env, role: Symbol, account: &Address, admin: &Address) {
     // Only admin can revoke roles
-    require_role(env, storage::DEFAULT_ADMIN_ROLE);
+    require_role(env, admin, storage::DEFAULT_ADMIN_ROLE);
 
     let role_key = (role.clone(), account.clone());
     env.storage().persistent().remove(&role_key);

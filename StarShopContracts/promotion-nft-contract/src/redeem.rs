@@ -1,5 +1,5 @@
 use crate::{roles, storage};
-use soroban_sdk::{Env, panic_with_error};
+use soroban_sdk::{Address, Env, panic_with_error};
 use stellar_tokens::non_fungible::Base;
 
 pub fn initialize_token_redemption(env: &Env, token_id: u32) {
@@ -7,13 +7,12 @@ pub fn initialize_token_redemption(env: &Env, token_id: u32) {
     env.storage().persistent().set(&redeemed_key, &false);
 }
 
-pub fn redeem_token(env: &Env, token_id: u32) {
+pub fn redeem_token(env: &Env, caller: &Address, token_id: u32) {
     // Verify token exists by checking if it has an owner
     let owner = Base::owner_of(env, token_id);
 
     // Verify caller authorization
-    let caller = env.current_contract_address();
-    let is_owner = caller == owner;
+    let is_owner = caller == &owner;
     let has_redeemer_role = roles::has_role(env, storage::REDEEMER_ROLE, &caller);
 
     if !is_owner && !has_redeemer_role {

@@ -2,8 +2,8 @@ use crate::{metadata, redeem, roles, storage};
 use soroban_sdk::{Address, Env, String};
 use stellar_tokens::non_fungible::Base;
 
-pub fn mint_promo(env: &Env, recipient: &Address, uri: Option<String>) -> u32 {
-    roles::require_role(&env, storage::MINTER_ROLE);
+pub fn mint_promo(env: &Env, caller: &Address, recipient: &Address, uri: Option<String>) -> u32 {
+    roles::require_role(&env, caller, storage::MINTER_ROLE);
 
     // Mint the NFT using OpenZeppelin's sequential mint
     let token_id = Base::sequential_mint(&env, &recipient);
