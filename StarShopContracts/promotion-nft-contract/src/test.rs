@@ -24,3 +24,15 @@ fn test_initialize_contract() {
     let initialized = env.storage().persistent().get(&storage::INITIALIZED_KEY).unwrap_or(false);
     assert_eq!(initialized, true);
 }
+
+#[test]
+fn test_mint_promo() {
+    let (env, client) = setup_test_environment();
+    let recipient = Address::from_str(&env, "recipient");
+    let metadata_uri = String::from_str(&env, "https://test.com");
+
+    let token_id = client.mint_promo(&recipient, &Some(metadata_uri.clone()));
+    let uri = client.get_token_metadata(&token_id);
+    assert_eq!(uri, Some(metadata_uri));
+}
+
