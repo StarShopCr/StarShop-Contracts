@@ -47,6 +47,17 @@ pub fn initialize_contract(env: &Env, admin: &Address, name: String, symbol: Str
     let role_key = (DEFAULT_ADMIN_ROLE, admin.clone());
     env.storage().persistent().set(&role_key, &true);
 
+    // Grant minter role to admin
+    let role_key = (MINTER_ROLE, admin.clone());
+    env.storage().persistent().set(&role_key, &true);
+
+    // Grant redeemer role to admin
+    let role_key = (REDEEMER_ROLE, admin.clone());
+    env.storage().persistent().set(&role_key, &true);
+
+    // Mark as initialized
+    env.storage().persistent().set(&INITIALIZED_KEY, &true);
+
     // Emit initialization event
     env.events().publish(
         (CONTRACT_INITIALIZED_EVENT,),
