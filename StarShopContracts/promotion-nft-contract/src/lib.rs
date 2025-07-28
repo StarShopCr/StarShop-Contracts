@@ -1,16 +1,14 @@
 #![no_std]
 
-pub mod storage;
 pub mod metadata;
 pub mod mint;
 pub mod redeem;
 pub mod roles;
+pub mod storage;
 
-
+use soroban_sdk::{Address, Env, String, Symbol, contract, contractimpl, panic_with_error};
 use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{Base, NonFungibleToken};
-use soroban_sdk::{Address, Env, String, panic_with_error, contract, contractimpl, Symbol};
-
 
 #[contract]
 pub struct StarshopPromoNFT;

@@ -1,5 +1,5 @@
+use crate::{metadata, redeem, roles, storage};
 use soroban_sdk::{Address, Env, String};
-use crate::{roles, storage, metadata, redeem};
 use stellar_tokens::non_fungible::Base;
 
 pub fn mint_promo(env: &Env, recipient: &Address, uri: Option<String>) -> u32 {
@@ -18,10 +18,9 @@ pub fn mint_promo(env: &Env, recipient: &Address, uri: Option<String>) -> u32 {
 
     // Emit promo minted event
     env.events().publish(
- (storage::PROMO_MINTED_EVENT,),
-    (token_id, recipient.clone())
+        (storage::PROMO_MINTED_EVENT,),
+        (token_id, recipient.clone()),
     );
 
     token_id
-
 }

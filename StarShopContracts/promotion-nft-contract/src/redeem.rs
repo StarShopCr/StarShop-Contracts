@@ -1,5 +1,5 @@
+use crate::{roles, storage};
 use soroban_sdk::{Env, panic_with_error};
-use crate::{storage, roles};
 use stellar_tokens::non_fungible::Base;
 
 pub fn initialize_token_redemption(env: &Env, token_id: u32) {
@@ -15,7 +15,7 @@ pub fn redeem_token(env: &Env, token_id: u32) {
     let caller = env.current_contract_address();
     let is_owner = caller == owner;
     let has_redeemer_role = roles::has_role(env, storage::REDEEMER_ROLE, &caller);
-    
+
     if !is_owner && !has_redeemer_role {
         panic_with_error!(env, storage::ContractError::MissingRole);
     }
@@ -35,15 +35,16 @@ pub fn redeem_token(env: &Env, token_id: u32) {
     env.storage().persistent().set(&redeem_time_key, &timestamp);
 
     // Emit redemption event
-    env.events().publish(
-        (storage::REDEEMED_EVENT,),
-        (token_id, caller, timestamp)
-    );
+    env.events()
+        .publish((storage::REDEEMED_EVENT,), (token_id, caller, timestamp));
 }
 
 pub fn is_token_redeemed(env: &Env, token_id: u32) -> bool {
     let redeemed_key = (storage::REDEEMED_KEY, token_id);
-    env.storage().persistent().get(&redeemed_key).unwrap_or(false)
+    env.storage()
+        .persistent()
+        .get(&redeemed_key)
+        .unwrap_or(false)
 }
 
 pub fn get_redemption_timestamp(env: &Env, token_id: u32) -> Option<u64> {

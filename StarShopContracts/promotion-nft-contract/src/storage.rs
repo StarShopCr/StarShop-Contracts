@@ -1,5 +1,5 @@
-use soroban_sdk::{Address, Env, Symbol, String, contracterror, panic_with_error, symbol_short};
-use stellar_tokens::non_fungible::{Base};
+use soroban_sdk::{Address, Env, String, Symbol, contracterror, panic_with_error, symbol_short};
+use stellar_tokens::non_fungible::Base;
 
 // Storage keys
 pub const INITIALIZED_KEY: Symbol = symbol_short!("INIT");
@@ -8,7 +8,6 @@ pub const OWNER_KEY: Symbol = symbol_short!("OWNER");
 pub const REDEEMED_KEY: Symbol = symbol_short!("REDEEM");
 pub const METADATA_URI_KEY: Symbol = symbol_short!("META_URI");
 pub const REDEEM_TIME_KEY: Symbol = symbol_short!("REDEEM_T");
-
 
 // Roles
 pub const DEFAULT_ADMIN_ROLE: Symbol = symbol_short!("ADMIN");
@@ -36,13 +35,19 @@ pub enum ContractError {
     TransferRestricted = 7,
 }
 
-pub fn initialize_contract(env: &Env, admin: &Address, name: String, symbol: String, base_uri: String){
+pub fn initialize_contract(
+    env: &Env,
+    admin: &Address,
+    name: String,
+    symbol: String,
+    base_uri: String,
+) {
     // Check if already initialized
     if env.storage().persistent().has(&INITIALIZED_KEY) {
         panic_with_error!(&env, ContractError::AlreadyInitialized);
     }
     Base::set_metadata(env, base_uri, name, symbol);
-    
+
     // Grant admin role to deployer
     let role_key = (DEFAULT_ADMIN_ROLE, admin.clone());
     env.storage().persistent().set(&role_key, &true);
@@ -59,10 +64,8 @@ pub fn initialize_contract(env: &Env, admin: &Address, name: String, symbol: Str
     env.storage().persistent().set(&INITIALIZED_KEY, &true);
 
     // Emit initialization event
-    env.events().publish(
-        (CONTRACT_INITIALIZED_EVENT,),
-        admin.clone()
-    );
+    env.events()
+        .publish((CONTRACT_INITIALIZED_EVENT,), admin.clone());
 }
 
 pub fn require_initialized(env: &Env) {
