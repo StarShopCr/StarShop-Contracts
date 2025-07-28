@@ -5,6 +5,7 @@ pub mod mint;
 pub mod redeem;
 pub mod roles;
 pub mod storage;
+pub mod test;
 
 use soroban_sdk::{Address, Env, String, Symbol, contract, contractimpl, panic_with_error};
 use stellar_macros::default_impl;
