@@ -6,7 +6,7 @@ pub mod redeem;
 pub mod roles;
 pub mod storage;
 
-use soroban_sdk::{Address, Env, String, Symbol, contract, contractimpl, panic_with_error};
+use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Env, String, Symbol};
 use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{Base, NonFungibleToken};
 

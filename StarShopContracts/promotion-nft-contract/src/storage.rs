@@ -1,9 +1,8 @@
-use soroban_sdk::{Address, Env, String, Symbol, contracterror, panic_with_error, symbol_short};
+use soroban_sdk::{contracterror, panic_with_error, symbol_short, Address, Env, String, Symbol};
 use stellar_tokens::non_fungible::Base;
 
 // Storage keys
 pub const INITIALIZED_KEY: Symbol = symbol_short!("INIT");
-pub const TOTAL_SUPPLY_KEY: Symbol = symbol_short!("SUPPLY");
 pub const OWNER_KEY: Symbol = symbol_short!("OWNER");
 pub const REDEEMED_KEY: Symbol = symbol_short!("REDEEM");
 pub const METADATA_URI_KEY: Symbol = symbol_short!("META_URI");

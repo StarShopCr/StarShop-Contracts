@@ -1,9 +1,5 @@
 use crate::storage;
-use soroban_sdk::{Address, Env, Symbol, panic_with_error};
-
-pub const DEFAULT_ADMIN_ROLE: u32 = 0;
-pub const MINTER_ROLE: u32 = 1;
-pub const REDEEMER_ROLE: u32 = 2;
+use soroban_sdk::{panic_with_error, Address, Env, Symbol};
 
 pub fn require_role(env: &Env, account: &Address, role: Symbol) {
     if !has_role(env, role, account) {

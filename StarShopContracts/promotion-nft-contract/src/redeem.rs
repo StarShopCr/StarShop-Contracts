@@ -1,5 +1,5 @@
 use crate::{roles, storage};
-use soroban_sdk::{Address, Env, panic_with_error};
+use soroban_sdk::{panic_with_error, Address, Env};
 use stellar_tokens::non_fungible::Base;
 
 pub fn initialize_token_redemption(env: &Env, token_id: u32) {
