@@ -7,6 +7,7 @@ pub const TOTAL_SUPPLY_KEY: Symbol = symbol_short!("SUPPLY");
 pub const OWNER_KEY: Symbol = symbol_short!("OWNER");
 pub const REDEEMED_KEY: Symbol = symbol_short!("REDEEM");
 pub const METADATA_URI_KEY: Symbol = symbol_short!("META_URI");
+pub const REDEEM_TIME_KEY: Symbol = symbol_short!("REDEEM_T");
 
 
 // Roles
