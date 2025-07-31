@@ -33,7 +33,7 @@ pub struct Drop {
 
 /// Status of a drop
 #[contracttype]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DropStatus {
     Pending,   // Drop created but not started
     Active,    // Drop is currently active
@@ -65,20 +65,22 @@ pub enum UserLevel {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-    NotInitialized = 1,     // Contract not initialized
-    AlreadyInitialized = 2, // Contract already setup
-    Unauthorized = 3,       // Caller lacks permission
-    DropNotFound = 4,       // Drop doesn't exist
-    DropNotActive = 5,      // Drop is not active
-    DropEnded = 6,          // Drop has ended
-    DropNotStarted = 7,     // Drop hasn't started yet
-    InsufficientSupply = 8, // Not enough items left
-    UserLimitExceeded = 9,  // User purchase limit reached
-    InvalidQuantity = 10,   // Invalid purchase quantity
-    InvalidTime = 11,       // Invalid time window
-    InvalidPrice = 12,      // Invalid price
-    NotWhitelisted = 13,    // User not whitelisted
-    InsufficientLevel = 14, // User level too low
-    InvalidUserLevel = 15,  // Invalid user level
-    PurchaseFailed = 16,    // Purchase transaction failed
+    NotInitialized = 1,           // Contract not initialized
+    AlreadyInitialized = 2,       // Contract already setup
+    Unauthorized = 3,             // Caller lacks permission
+    DropNotFound = 4,             // Drop doesn't exist
+    DropNotActive = 5,            // Drop is not active
+    DropEnded = 6,                // Drop has ended
+    DropNotStarted = 7,           // Drop hasn't started yet
+    InsufficientSupply = 8,       // Not enough items left
+    UserLimitExceeded = 9,        // User purchase limit reached
+    InvalidQuantity = 10,         // Invalid purchase quantity
+    InvalidTime = 11,             // Invalid time window
+    InvalidPrice = 12,            // Invalid price
+    NotWhitelisted = 13,          // User not whitelisted
+    InsufficientLevel = 14,       // User level too low
+    InvalidUserLevel = 15,        // Invalid user level
+    PurchaseFailed = 16,          // Purchase transaction failed
+    DuplicateWhitelistEntry = 17, // Duplicate whitelisted address
+    InvalidStatusTransition = 18, // Invalid drop status transition
 }

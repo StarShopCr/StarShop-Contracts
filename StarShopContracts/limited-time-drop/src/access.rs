@@ -16,7 +16,8 @@ impl AccessManager {
 
     /// Add user to whitelist
     pub fn add_to_whitelist(env: &Env, admin: &Address, user: &Address) -> Result<(), Error> {
-        // Verify admin
+        // Verify admin authentication and authorization
+
         Self::verify_admin(env, admin)?;
 
         let mut whitelist: Vec<Address> = env
@@ -27,7 +28,7 @@ impl AccessManager {
 
         // Check if already whitelisted
         if whitelist.contains(user) {
-            return Ok(());
+            return Err(Error::DuplicateWhitelistEntry);
         }
 
         whitelist.push_back(user.clone());
@@ -40,7 +41,7 @@ impl AccessManager {
 
     /// Remove user from whitelist
     pub fn remove_from_whitelist(env: &Env, admin: &Address, user: &Address) -> Result<(), Error> {
-        // Verify admin
+        // Verify admin authentication and authorization
         Self::verify_admin(env, admin)?;
 
         let mut whitelist: Vec<Address> = env
@@ -78,13 +79,11 @@ impl AccessManager {
         user: &Address,
         level: UserLevel,
     ) -> Result<(), Error> {
-        // Verify admin
-        Self::verify_admin(env, admin)?;
-
+        Self::verify_admin(env, admin)?; // Checks this address is the admin
+                                         // Set user level (all enum variants are valid)
         env.storage()
             .instance()
             .set(&DataKey::UserLevels(user.clone()), &level);
-
         Ok(())
     }
 
