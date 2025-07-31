@@ -25,7 +25,13 @@ pub trait ProductVotingTrait {
     fn get_trending_products(env: Env) -> Vec<Symbol>;
 
     // SECURITY FIX: Admin Functions
-    fn init_admin(env: Env, admin: Address, max_products_per_user: u32) -> Result<(), Error>;
+    fn init_admin(
+        env: Env,
+        admin: Address,
+        max_products_per_user: u32,
+        voting_period_days: u32,
+        reversal_window_hours: u32,
+    ) -> Result<(), Error>;
     fn get_admin_config(env: Env) -> Result<AdminConfig, Error>;
     fn deactivate_product(env: Env, product_id: Symbol) -> Result<(), Error>;
     fn reset_rankings(env: Env) -> Result<(), Error>;
@@ -83,8 +89,20 @@ impl ProductVotingTrait for ProductVoting {
     }
 
     // ADMIN FUNCTIONS: Require admin authorization
-    fn init_admin(env: Env, admin: Address, max_products_per_user: u32) -> Result<(), Error> {
-        VoteManager::init_admin(&env, admin, max_products_per_user)
+    fn init_admin(
+        env: Env,
+        admin: Address,
+        max_products_per_user: u32,
+        voting_period_days: u32,
+        reversal_window_hours: u32,
+    ) -> Result<(), Error> {
+        VoteManager::init_admin(
+            &env,
+            admin,
+            max_products_per_user,
+            voting_period_days,
+            reversal_window_hours,
+        )
     }
 
     fn get_admin_config(env: Env) -> Result<AdminConfig, Error> {
