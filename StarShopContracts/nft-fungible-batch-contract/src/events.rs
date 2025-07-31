@@ -1,11 +1,11 @@
 //! Event definitions and emission for Starshop NFT-Fungible Batch Distribution Contract
 
-use soroban_sdk::{Env, Address, Symbol};
+use soroban_sdk::{Env, Address, symbol_short};
 
 // Event: RoleGranted
 pub fn emit_role_granted(env: &Env, role: &[u8; 32], account: &Address, sender: &Address) {
     env.events().publish(
-        (Symbol::short("RoleGranted"), role.to_vec(), account.clone()),
+        (symbol_short!("RoleGrant"), role.to_vec(), account.clone()),
         sender.clone(),
     );
 }
@@ -13,7 +13,7 @@ pub fn emit_role_granted(env: &Env, role: &[u8; 32], account: &Address, sender: 
 // Event: RoleRevoked
 pub fn emit_role_revoked(env: &Env, role: &[u8; 32], account: &Address, sender: &Address) {
     env.events().publish(
-        (Symbol::short("RoleRevoked"), role.to_vec(), account.clone()),
+        (symbol_short!("RoleRevok"), role.to_vec(), account.clone()),
         sender.clone(),
     );
 }
@@ -21,7 +21,7 @@ pub fn emit_role_revoked(env: &Env, role: &[u8; 32], account: &Address, sender: 
 // Event: ContractInitialized
 pub fn emit_contract_initialized(env: &Env, admin: &Address) {
     env.events().publish(
-        Symbol::short("ContractInitialized"),
+        (symbol_short!("Init"),),
         admin.clone(),
     );
 }
@@ -29,7 +29,7 @@ pub fn emit_contract_initialized(env: &Env, admin: &Address) {
 // Event: NFTMinted
 pub fn emit_nft_minted(env: &Env, token_id: u128, recipient: &Address) {
     env.events().publish(
-        (Symbol::short("NFTMinted"), token_id),
+        (symbol_short!("NFTMint"), token_id),
         recipient.clone(),
     );
 }
@@ -37,7 +37,7 @@ pub fn emit_nft_minted(env: &Env, token_id: u128, recipient: &Address) {
 // Event: NFTBatchMinted
 pub fn emit_nft_batch_minted(env: &Env, quantity: u32, recipient: &Address) {
     env.events().publish(
-        (Symbol::short("NFTBatchMinted"), quantity),
+        (symbol_short!("BatchMint"), quantity),
         recipient.clone(),
     );
 }
@@ -45,7 +45,7 @@ pub fn emit_nft_batch_minted(env: &Env, quantity: u32, recipient: &Address) {
 // Event: Transfer
 pub fn emit_transfer(env: &Env, from: &Address, to: &Address, token_id: u128) {
     env.events().publish(
-        (Symbol::short("Transfer"), from.clone(), to.clone()),
+        (symbol_short!("Transfer"), from.clone(), to.clone()),
         token_id,
     );
 }
