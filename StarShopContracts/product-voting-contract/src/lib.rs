@@ -124,7 +124,6 @@ impl ProductVotingTrait for ProductVoting {
 
     // TRANSPARENCY: Audit trail access
     fn get_vote_history(env: Env, product_id: Symbol) -> Option<Vec<types::VoteHistoryEntry>> {
-        let product = VoteManager::get_product(&env, product_id)?;
-        Some(product.vote_history)
+        VoteManager::get_product(&env, product_id).map(|product| product.vote_history)
     }
 }
