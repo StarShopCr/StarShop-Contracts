@@ -22,8 +22,9 @@ impl NFTFungibleBatchContract {
         if is_initialized(&env) {
             panic!("Contract already initialized");
         }
-        // Grant admin role
-        grant_role(&env, DEFAULT_ADMIN_ROLE, &admin, &admin);
+        // Grant initial admin role (bypass normal access control during init)
+        env.storage().instance().set(&crate::roles::role_key(DEFAULT_ADMIN_ROLE, &admin), &true);
+        crate::events::emit_role_granted(&env, DEFAULT_ADMIN_ROLE, &admin, &admin);
         // Mark as initialized
         set_initialized(&env);
         // Emit event
