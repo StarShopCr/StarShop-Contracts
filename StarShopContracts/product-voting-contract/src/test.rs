@@ -30,9 +30,10 @@ mod tests {
 
         let id = Symbol::new(&env, "product1");
         let name = Symbol::new(&env, "Product_1");
+        let creator = Address::generate(&env);
         client.init();
 
-        let result = client.try_create_product(&id, &name);
+        let result = client.try_create_product(&id, &name, &creator);
         assert!(result.is_ok(), "create_product failed with an error");
         let score = client.get_product_score(&id);
         assert_eq!(score, 0)
@@ -47,12 +48,13 @@ mod tests {
 
         let id = Symbol::new(&env, "product1");
         let name = Symbol::new(&env, "Product_1");
+        let creator = Address::generate(&env);
 
         // First creation should succeed
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         // Second creation should fail with ProductExists
-        let result = client.try_create_product(&id, &name);
+        let result = client.try_create_product(&id, &name, &creator);
 
         // Ensure the result is an error
         assert!(result.is_err(), "Expected error, but got Ok");
@@ -67,6 +69,7 @@ mod tests {
 
         let id = Symbol::new(&env, "product1");
         let name = Symbol::new(&env, "Product_1");
+        let creator = Address::generate(&env);
 
         let voter = Address::generate(&env);
 
@@ -84,7 +87,7 @@ mod tests {
             ..Default::default()
         });
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         for _ in 0..DAILY_VOTE_LIMIT {
             let result = client.try_cast_vote(&id, &VoteType::Upvote, &voter);
@@ -105,12 +108,13 @@ mod tests {
 
         let id = Symbol::new(&env, "product1");
         let name = Symbol::new(&env, "Product_1");
+        let creator = Address::generate(&env);
 
         let voter = Address::generate(&env);
 
         client.init();
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
         let result = client.try_cast_vote(&id, &VoteType::Upvote, &voter);
 
         assert!(result.is_err(), "Expected error, but got Ok");
@@ -125,6 +129,7 @@ mod tests {
 
         let id = Symbol::new(&env, "product1");
         let name = Symbol::new(&env, "Product_1");
+        let creator = Address::generate(&env);
 
         let voter = Address::generate(&env);
 
@@ -142,7 +147,7 @@ mod tests {
             ..Default::default()
         });
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
         client.cast_vote(&id, &VoteType::Upvote, &voter);
 
         // Simulate time passing
@@ -174,8 +179,9 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         // Set initial timestamp
         let initial_time = 1000000;
@@ -223,8 +229,9 @@ mod tests {
         // Create test products
         let product1 = Symbol::new(&env, "product1");
         let product2 = Symbol::new(&env, "product2");
-        client.create_product(&product1, &Symbol::new(&env, "Product_1"));
-        client.create_product(&product2, &Symbol::new(&env, "Product_2"));
+        let creator = Address::generate(&env);
+        client.create_product(&product1, &Symbol::new(&env, "Product_1"), &creator);
+        client.create_product(&product2, &Symbol::new(&env, "Product_2"), &creator);
 
         // Set valid account age
         env.ledger().set(LedgerInfo {
@@ -272,8 +279,9 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         let voter = Address::generate(&env);
 
@@ -311,8 +319,9 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         let voter = Address::generate(&env);
 
@@ -361,6 +370,7 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
 
         // Set valid account age
@@ -376,7 +386,7 @@ mod tests {
             ..Default::default()
         });
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         // Use a voter to verify product creation
         let voter = Address::generate(&env);
@@ -399,6 +409,7 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
 
         // Set valid account age
@@ -414,7 +425,7 @@ mod tests {
             ..Default::default()
         });
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         let voter = Address::generate(&env);
         client.cast_vote(&id, &VoteType::Upvote, &voter);
@@ -449,6 +460,7 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
 
         // Set valid account age
@@ -464,7 +476,7 @@ mod tests {
             ..Default::default()
         });
 
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         let voter = Address::generate(&env);
 
@@ -504,8 +516,9 @@ mod tests {
 
         let id = Symbol::new(&env, "test_product");
         let name = Symbol::new(&env, "Test_Product");
+        let creator = Address::generate(&env);
         client.init();
-        client.create_product(&id, &name);
+        client.create_product(&id, &name, &creator);
 
         // Set initial timestamp for valid account age
         let initial_time = 1000000;
@@ -550,7 +563,8 @@ mod tests {
             RankingCalculator::init(&env);
 
             let product1 = Symbol::new(&env, "prod1");
-            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"))
+            let creator = Address::generate(&env);
+            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"), creator)
                 .unwrap();
 
             let voter1 = Address::generate(&env);
@@ -581,7 +595,8 @@ mod tests {
             RankingCalculator::init(&env);
 
             let product1 = Symbol::new(&env, "prod1");
-            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"))
+            let creator = Address::generate(&env);
+            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"), creator.clone())
                 .unwrap();
 
             let voter1 = Address::generate(&env);
@@ -607,10 +622,11 @@ mod tests {
 
             let product1 = Symbol::new(&env, "prod1");
             let product2 = Symbol::new(&env, "prod2");
+            let creator = Address::generate(&env);
 
-            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"))
+            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"), creator.clone())
                 .unwrap();
-            VoteManager::create_product(&env, product2.clone(), Symbol::new(&env, "Product2"))
+            VoteManager::create_product(&env, product2.clone(), Symbol::new(&env, "Product2"), creator.clone())
                 .unwrap();
 
             // No votes scenario
@@ -662,12 +678,13 @@ mod tests {
             let product1 = Symbol::new(&env, "prod1");
             let product2 = Symbol::new(&env, "prod2");
             let product3 = Symbol::new(&env, "prod3");
+            let creator = Address::generate(&env);
 
-            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"))
+            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"), creator.clone())
                 .unwrap();
-            VoteManager::create_product(&env, product2.clone(), Symbol::new(&env, "Product2"))
+            VoteManager::create_product(&env, product2.clone(), Symbol::new(&env, "Product2"), creator.clone())
                 .unwrap();
-            VoteManager::create_product(&env, product3.clone(), Symbol::new(&env, "Product3"))
+            VoteManager::create_product(&env, product3.clone(), Symbol::new(&env, "Product3"), creator.clone())
                 .unwrap();
 
             let voter1 = Address::generate(&env);
@@ -735,7 +752,8 @@ mod tests {
             RankingCalculator::init(&env);
 
             let product1 = Symbol::new(&env, "prod1");
-            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"))
+            let creator = Address::generate(&env);
+            VoteManager::create_product(&env, product1.clone(), Symbol::new(&env, "Product1"), creator.clone())
                 .unwrap();
 
             let voter = Address::generate(&env);
