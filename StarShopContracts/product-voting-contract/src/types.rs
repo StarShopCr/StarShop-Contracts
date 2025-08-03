@@ -1,10 +1,10 @@
 use soroban_sdk::{contracterror, contracttype, Address, Map, Symbol, Vec};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
 #[contracttype]
-#[derive(Debug)]
 pub enum VoteType {
+    None = 0,
     Upvote = 1,
     Downvote = 2,
 }
@@ -60,13 +60,12 @@ pub struct VoteHistoryEntry {
     pub vote_type: VoteType,
     pub timestamp: u64,
     pub action: VoteAction,
-    pub previous_vote: Option<VoteType>,
+    pub previous_vote: VoteType,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
 #[contracttype]
-#[derive(Debug)]
 pub enum VoteAction {
     NewVote = 1,
     ChangeVote = 2,
@@ -101,7 +100,7 @@ pub struct VoteCastEvent {
     pub voter: Address,
     pub vote_type: VoteType,
     pub timestamp: u64,
-    pub previous_vote: Option<VoteType>,
+    pub previous_vote: VoteType,
 }
 
 // DATA KEYS for storage organization

@@ -196,7 +196,7 @@ impl VoteManager {
             vote_type,
             timestamp: now,
             action: vote_action,
-            previous_vote: previous_vote_type,
+            previous_vote: previous_vote_type.unwrap_or(VoteType::None),
         };
 
         product.votes.set(voter.clone(), vote);
@@ -211,7 +211,7 @@ impl VoteManager {
             voter,
             vote_type,
             timestamp: now,
-            previous_vote: previous_vote_type,
+            previous_vote: previous_vote_type.unwrap_or(VoteType::None),
         };
         env.events().publish(("vote_cast",), event);
 

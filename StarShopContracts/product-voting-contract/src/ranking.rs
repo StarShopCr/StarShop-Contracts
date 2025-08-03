@@ -127,6 +127,10 @@ impl RankingCalculator {
                     VoteType::Downvote => {
                         base_score = base_score.saturating_sub(1);
                     }
+                    VoteType::None => {
+                        // Skip None votes - they don't affect the score
+                        continue;
+                    }
                 }
                 total_votes = total_votes.saturating_add(1);
                 
