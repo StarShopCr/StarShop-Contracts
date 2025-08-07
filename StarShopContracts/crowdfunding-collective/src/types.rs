@@ -2,13 +2,14 @@ use soroban_sdk::{contracttype, Address, String};
 
 #[contracttype]
 pub enum DataKey {
-    Admin,                   // Admin address
-    Products(u32),           // Product ID -> Product
-    Contributions(u32),      // Product ID -> Vec<Contribution>
-    Rewards(u32),            // Product ID -> Vec<RewardTier>
-    Milestones(u32),         // Product ID -> Vec<Milestone>
-    NextProductId,           // Counter for product IDs
-    ContributionsTotal(u32), // Product ID -> Total contributed amount
+    Admin,                       // Admin address
+    Products(u32),               // Product ID -> Product
+    Contributions(u32),          // Product ID -> Vec<Contribution>
+    Rewards(u32),                // Product ID -> Vec<RewardTier>
+    Milestones(u32),             // Product ID -> Vec<Milestone>
+    NextProductId,               // Counter for product IDs
+    ContributionsTotal(u32),     // Product ID -> Total contributed amount
+    RewardClaimed(u32, Address), // Track reward claims (product_id, contributor)
 }
 
 #[contracttype]

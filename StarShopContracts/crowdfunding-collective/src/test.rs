@@ -56,6 +56,42 @@ impl<'a> CrowdfundingTest<'a> {
             contributor2,
         }
     }
+
+    fn distribute_funds(&self, caller: &Address, product_id: u32) {
+        self.client
+            .mock_auths(&[MockAuth {
+                address: caller,
+                invoke: &MockAuthInvoke {
+                    contract: &self.contract_id,
+                    fn_name: "distribute_funds",
+                    args: vec![
+                        &self.env,
+                        caller.clone().into_val(&self.env),
+                        product_id.into_val(&self.env),
+                    ],
+                    sub_invokes: &[],
+                },
+            }])
+            .distribute_funds(caller, &product_id);
+    }
+
+    fn refund_contributors(&self, caller: &Address, product_id: u32) {
+        self.client
+            .mock_auths(&[MockAuth {
+                address: caller,
+                invoke: &MockAuthInvoke {
+                    contract: &self.contract_id,
+                    fn_name: "refund_contributors",
+                    args: vec![
+                        &self.env,
+                        caller.clone().into_val(&self.env),
+                        product_id.into_val(&self.env),
+                    ],
+                    sub_invokes: &[],
+                },
+            }])
+            .refund_contributors(caller, &product_id);
+    }
 }
 
 // Helper function to advance ledger time
@@ -578,6 +614,8 @@ fn test_update_milestone_already_completed_fails() {
     let test = CrowdfundingTest::setup();
     let product_id = create_test_product(&test, 100, 3600, None, None);
     let contributor1_amount = 100;
+
+    // Fund the product
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor1,
@@ -593,9 +631,11 @@ fn test_update_milestone_already_completed_fails() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor1, &product_id, &contributor1_amount); // Fund
+        .contribute(&test.contributor1, &product_id, &contributor1_amount);
 
-    let milestone_id = 0; // First milestone
+    let milestone_id = 0;
+
+    // Complete milestone first time
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -611,7 +651,9 @@ fn test_update_milestone_already_completed_fails() {
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Complete milestone
+        .update_milestone(&test.creator, &product_id, &milestone_id);
+
+    // Try to complete same milestone again - should panic with exact message
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -627,7 +669,7 @@ fn test_update_milestone_already_completed_fails() {
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Try to complete again, should panic
+        .update_milestone(&test.creator, &product_id, &milestone_id);
 }
 
 #[test]
@@ -637,8 +679,7 @@ fn test_distribute_funds_successful() {
     let total_funded_amount = 100;
     let product_id = create_test_product(&test, total_funded_amount, 3600, None, None);
 
-    let milestone_id = 0;
-
+    // Fund the product
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor1,
@@ -654,7 +695,10 @@ fn test_distribute_funds_successful() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor1, &product_id, &total_funded_amount); // Fund it
+        .contribute(&test.contributor1, &product_id, &total_funded_amount);
+
+    // Complete milestone
+    let milestone_id = 0;
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -670,12 +714,22 @@ fn test_distribute_funds_successful() {
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Complete milestone
+        .update_milestone(&test.creator, &product_id, &milestone_id);
 
-    test.client.distribute_funds(&product_id);
+    // Verify product is still Funded (not Completed)
+    assert_eq!(
+        test.client.get_product_status(&product_id),
+        ProductStatus::Funded
+    );
 
-    let product_data = test.client.get_product(&product_id);
-    assert_eq!(product_data.status, ProductStatus::Completed);
+    // Now distribute funds to complete the project
+    test.distribute_funds(&test.creator, product_id);
+
+    // Verify status is now Completed
+    assert_eq!(
+        test.client.get_product_status(&product_id),
+        ProductStatus::Completed
+    );
 }
 
 #[test]
@@ -683,7 +737,7 @@ fn test_distribute_funds_successful() {
 fn test_distribute_funds_not_funded_fails() {
     let test = CrowdfundingTest::setup();
     let product_id = create_test_product(&test, 100, 3600, None, None); // Not funded
-    test.client.distribute_funds(&product_id);
+    test.distribute_funds(&test.creator, product_id);
 }
 
 #[test]
@@ -709,7 +763,7 @@ fn test_distribute_funds_milestones_not_completed_fails() {
         }])
         .contribute(&test.contributor1, &product_id, &contribute1_amount); // Fund it
                                                                            // Milestones not completed
-    test.client.distribute_funds(&product_id);
+    test.distribute_funds(&test.creator, product_id);
 }
 
 #[test]
@@ -755,7 +809,7 @@ fn test_refund_contributors_successful() {
 
     advance_ledger_time(env, 101); // Pass deadline, product still Active (not fully funded)
 
-    test.client.refund_contributors(&product_id);
+    test.refund_contributors(&test.creator, product_id);
 
     let product_data = test.client.get_product(&product_id);
     assert_eq!(product_data.status, ProductStatus::Failed);
@@ -791,7 +845,7 @@ fn test_refund_contributors_product_funded_fails() {
         ProductStatus::Funded
     );
     advance_ledger_time(&test.env, 1001); // Pass deadline
-    test.client.refund_contributors(&product_id); // Should panic as product is Funded
+    test.refund_contributors(&test.creator, product_id); // Should panic as product is Funded
 }
 
 #[test]
@@ -816,7 +870,7 @@ fn test_refund_contributors_before_deadline_fails() {
             },
         }])
         .contribute(&test.contributor1, &product_id, &contribution1_amount); // Fund it
-    test.client.refund_contributors(&product_id); // Should panic
+    test.refund_contributors(&test.creator, product_id); // Should panic
 }
 
 #[test]
@@ -844,6 +898,7 @@ fn test_claim_reward_successful() {
     let contributor1_amount = 75; // Eligible for Tier 1
     let contributor2_amount = 125; // Eligible for Tier 2, also funds product
 
+    // First contribution
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor1,
@@ -859,7 +914,9 @@ fn test_claim_reward_successful() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor1, &product_id, &contributor1_amount); // Eligible for Tier 1
+        .contribute(&test.contributor1, &product_id, &contributor1_amount);
+
+    // Second contribution to fund the product
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor2,
@@ -875,9 +932,10 @@ fn test_claim_reward_successful() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor2, &product_id, &contributor2_amount); // Eligible for Tier 2
+        .contribute(&test.contributor2, &product_id, &contributor2_amount);
 
-    let milestone_id = 0; // First milestone
+    // Complete milestone
+    let milestone_id = 0;
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -893,8 +951,30 @@ fn test_claim_reward_successful() {
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Complete milestone
-    test.client.distribute_funds(&product_id); // Product Completed
+        .update_milestone(&test.creator, &product_id, &milestone_id);
+
+    // Distribute funds to mark product as completed
+    test.client
+        .mock_auths(&[MockAuth {
+            address: &test.creator,
+            invoke: &MockAuthInvoke {
+                contract: &test.contract_id,
+                fn_name: "distribute_funds",
+                args: vec![
+                    env,
+                    test.creator.clone().into_val(env),
+                    product_id.into_val(env),
+                ],
+                sub_invokes: &[],
+            },
+        }])
+        .distribute_funds(&test.creator, &product_id);
+
+    // Verify product is completed
+    assert_eq!(
+        test.client.get_product_status(&product_id),
+        ProductStatus::Completed
+    );
 
     // Contributor1 claims reward
     test.client
@@ -977,7 +1057,8 @@ fn test_claim_reward_no_contributions_fails() {
     let test = CrowdfundingTest::setup();
     let product_id = create_test_product(&test, 100, 1000, None, None);
     let contributor1_amount = 100;
-    let milestone_id = 0;
+
+    // Fund the product with contributor1
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor1,
@@ -993,7 +1074,9 @@ fn test_claim_reward_no_contributions_fails() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor1, &product_id, &contributor1_amount); // Fund it
+        .contribute(&test.contributor1, &product_id, &contributor1_amount);
+
+    // Complete milestone and mark product as completed
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -1004,15 +1087,30 @@ fn test_claim_reward_no_contributions_fails() {
                     &test.env,
                     test.creator.clone().into_val(&test.env),
                     product_id.into_val(&test.env),
-                    milestone_id.into_val(&test.env),
+                    0u32.into_val(&test.env),
                 ],
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Complete milestone
-    test.client.distribute_funds(&product_id); // Product completed
+        .update_milestone(&test.creator, &product_id, &0u32);
 
-    // C2 (who didn't contribute) tries to claim
+    test.client
+        .mock_auths(&[MockAuth {
+            address: &test.creator,
+            invoke: &MockAuthInvoke {
+                contract: &test.contract_id,
+                fn_name: "distribute_funds",
+                args: vec![
+                    &test.env,
+                    test.creator.clone().into_val(&test.env),
+                    product_id.into_val(&test.env),
+                ],
+                sub_invokes: &[],
+            },
+        }])
+        .distribute_funds(&test.creator, &product_id);
+
+    // Now try to claim with contributor2 who didn't contribute
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor2,
@@ -1027,7 +1125,7 @@ fn test_claim_reward_no_contributions_fails() {
                 sub_invokes: &[],
             },
         }])
-        .claim_reward(&test.contributor2, &product_id); // Should panic
+        .claim_reward(&test.contributor2, &product_id);
 }
 
 #[test]
@@ -1046,7 +1144,6 @@ fn test_claim_reward_no_eligible_tier_fails() {
     ];
     let product_id = create_test_product(&test, 100, 1000, Some(reward_tiers), None);
     let contributor1_amount = 50; // Less than min for any tier
-    let milestone_id = 0;
 
     test.client
         .mock_auths(&[MockAuth {
@@ -1063,8 +1160,9 @@ fn test_claim_reward_no_eligible_tier_fails() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&test.contributor1, &product_id, &contributor1_amount); // Fund it
-                                                                            // Fund fully with another contributor to allow completion
+        .contribute(&test.contributor1, &product_id, &contributor1_amount);
+
+    // Fund fully with another contributor to allow completion
     let another_contributor = Address::generate(env);
     test.client
         .mock_auths(&[MockAuth {
@@ -1081,8 +1179,9 @@ fn test_claim_reward_no_eligible_tier_fails() {
                 sub_invokes: &[],
             },
         }])
-        .contribute(&another_contributor, &product_id, &contributor1_amount); // Fund it to meet goal
+        .contribute(&another_contributor, &product_id, &contributor1_amount);
 
+    // Complete milestone
     test.client
         .mock_auths(&[MockAuth {
             address: &test.creator,
@@ -1090,17 +1189,33 @@ fn test_claim_reward_no_eligible_tier_fails() {
                 contract: &test.contract_id,
                 fn_name: "update_milestone",
                 args: vec![
-                    env,
-                    test.creator.clone().into_val(env),
-                    product_id.into_val(env),
-                    milestone_id.into_val(env),
+                    &test.env,
+                    test.creator.clone().into_val(&test.env),
+                    product_id.into_val(&test.env),
+                    0u32.into_val(&test.env),
                 ],
                 sub_invokes: &[],
             },
         }])
-        .update_milestone(&test.creator, &product_id, &milestone_id); // Complete milestone
-    test.client.distribute_funds(&product_id); // Product completed
+        .update_milestone(&test.creator, &product_id, &0u32);
 
+    test.client
+        .mock_auths(&[MockAuth {
+            address: &test.creator,
+            invoke: &MockAuthInvoke {
+                contract: &test.contract_id,
+                fn_name: "distribute_funds",
+                args: vec![
+                    &test.env,
+                    test.creator.clone().into_val(&test.env),
+                    product_id.into_val(&test.env),
+                ],
+                sub_invokes: &[],
+            },
+        }])
+        .distribute_funds(&test.creator, &product_id);
+
+    // Now try to claim reward with contributor1 who contributed too little
     test.client
         .mock_auths(&[MockAuth {
             address: &test.contributor1,
@@ -1115,7 +1230,7 @@ fn test_claim_reward_no_eligible_tier_fails() {
                 sub_invokes: &[],
             },
         }])
-        .claim_reward(&test.contributor1, &product_id); // Should panic as no eligible tier
+        .claim_reward(&test.contributor1, &product_id);
 }
 
 #[test]
