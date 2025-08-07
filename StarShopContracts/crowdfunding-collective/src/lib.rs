@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 mod funding;
 mod product;
@@ -24,8 +24,16 @@ impl CrowdfundingCollective {
     // Initialize the contract
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
+        if env.storage().instance().has(&DataKey::Admin) {
+            panic!("Contract already initialized");
+        }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::NextProductId, &1u32);
+        
+        env.events().publish(
+            (Symbol::new(&env, "Initialized"),),
+            admin
+        );
     }
 
     // Product functions
@@ -35,7 +43,7 @@ impl CrowdfundingCollective {
         name: String,
         description: String,
         funding_goal: u64,
-        deadline: u64, // Changed from &u64
+        deadline: u64,
         reward_tiers: Vec<RewardTier>,
         milestones: Vec<Milestone>,
     ) -> u32 {
@@ -56,12 +64,12 @@ impl CrowdfundingCollective {
         funding::contribute(env, contributor, product_id, amount)
     }
 
-    pub fn distribute_funds(env: Env, product_id: u32) {
-        funding::distribute_funds(env, product_id)
+    pub fn distribute_funds(env: Env, caller: Address, product_id: u32) {
+        funding::distribute_funds(env, caller, product_id)
     }
 
-    pub fn refund_contributors(env: Env, product_id: u32) {
-        funding::refund_contributors(env, product_id)
+    pub fn refund_contributors(env: Env, caller: Address, product_id: u32) {
+        funding::refund_contributors(env, caller, product_id)
     }
 
     // Reward functions
@@ -88,5 +96,9 @@ impl CrowdfundingCollective {
 
     pub fn get_reward_tiers(env: Env, product_id: u32) -> Vec<RewardTier> {
         rewards::get_reward_tiers(env, product_id)
+    }
+
+    pub fn get_product_status(env: Env, product_id: u32) -> ProductStatus {
+        product::get_product(env, product_id).status
     }
 }
