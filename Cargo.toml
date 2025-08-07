@@ -10,6 +10,7 @@ members = [
     "StarShopContracts/limited-time-drop",
     "StarShopContracts/loyalty-rewards-contract",
     "StarShopContracts/multi-auction-contract",
+    "StarShopContracts/nft-fungible-batch-contract",
     "StarShopContracts/product-follow-contract",
     "StarShopContracts/product-voting-contract",
     "StarShopContracts/promotional-boost-contract",
