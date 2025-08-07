@@ -22,8 +22,8 @@ pub fn mint_batch(env: &Env, recipient: &Address, quantity: u32, sender: &Addres
     }
     // Update recipient's balance
     let prev_balance = get_owner_balance(env, recipient);
-+   let new_balance = prev_balance.checked_add(quantity).expect("Balance overflow");
-+   set_owner_balance(env, recipient, new_balance);
+    let new_balance = prev_balance.checked_add(quantity).expect("Balance overflow");
+    set_owner_balance(env, recipient, new_balance);
     // Update total supply
     increment_total_supply(env, quantity);
     // Emit batch event

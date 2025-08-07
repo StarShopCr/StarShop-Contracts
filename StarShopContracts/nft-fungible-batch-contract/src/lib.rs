@@ -8,7 +8,7 @@ mod events;
 mod storage;
 
 use soroban_sdk::{contract, contractimpl, Env, Address};
-use crate::roles::{DEFAULT_ADMIN_ROLE, grant_role};
+use crate::roles::DEFAULT_ADMIN_ROLE;
 use crate::storage::{is_initialized, set_initialized, get_token_owner, get_owner_balance, get_total_supply};
 use crate::events::emit_contract_initialized;
 

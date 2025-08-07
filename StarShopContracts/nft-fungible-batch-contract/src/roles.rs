@@ -8,7 +8,7 @@ pub const DEFAULT_ADMIN_ROLE: &[u8; 32] = b"DEFAULT_ADMIN_ROLE______________";
 pub const MINTER_ROLE: &[u8; 32] = b"MINTER_ROLE_____________________";
 
 /// Storage key prefix for roles
-fn role_key(role: &[u8; 32], addr: &Address) -> (Symbol, Vec<u8>, Address) {
+pub fn role_key(role: &[u8; 32], addr: &Address) -> (Symbol, Vec<u8>, Address) {
     (symbol_short!("role"), role.to_vec(), addr.clone())
 }
 
