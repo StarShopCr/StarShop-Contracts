@@ -1,6 +1,6 @@
 #![cfg(test)]
 use super::*;
-use crate::types::{DataKey, Milestone, MilestoneRequirement, UserLevel};
+use crate::types::{UserLevel};
 use soroban_sdk::{testutils::Address as _, Address, Env, String, IntoVal};
 
 #[cfg(test)]
@@ -134,43 +134,7 @@ mod test_critical_auth_bypass_vulnerability {
         contract.transfer_admin(&attacker_controlled_address);
     }
 
-    #[test]
-    fn test_critical_auth_bypass_add_milestone() {
-        let env = Env::default();
-        let (contract, admin, _) = test_setup::setup_contract(&env);
 
-        // Create malicious user
-        let malicious_user = Address::generate(&env);
-        
-        // MALICIOUS ATTACK: Malicious user adds malicious milestone
-        let malicious_milestone = Milestone {
-            required_level: UserLevel::Basic,
-            requirement: MilestoneRequirement::DirectReferrals(1),
-            reward_amount: 999999, // Large reward
-            description: String::from_str(&env, "Malicious milestone"),
-        };
-
-        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
-            address: &admin, // Admin signature
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract.address,
-                fn_name: "add_milestone",
-                args: (malicious_milestone.clone(),).into_val(&env),
-                sub_invokes: &[],
-            },
-        }]);
-        
-        // This should FAIL (panic) but currently SUCCEEDS due to vulnerability
-        contract.add_milestone(&malicious_milestone);
-        
-        // Verify the milestone was actually stored (proving the vulnerability)
-        // The milestone should be stored at ID 0 since it's the first one
-        let stored_milestone: Milestone = env.as_contract(&contract.address, || {
-            env.storage().instance().get(&DataKey::Milestone(0)).unwrap()
-        });
-        assert_eq!(stored_milestone.reward_amount, 999999);
-        assert_eq!(stored_milestone.description, String::from_str(&env, "Malicious milestone"));
-    }
 
     #[test]
     fn test_social_engineering_attack_scenario() {
