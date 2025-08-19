@@ -1,6 +1,6 @@
 #![cfg(test)]
 use super::*;
-use crate::types::{MilestoneRequirement, UserLevel};
+use crate::types::{DataKey, Milestone, MilestoneRequirement, UserLevel};
 use soroban_sdk::{testutils::Address as _, Address, Env, String, IntoVal};
 
 #[cfg(test)]
@@ -13,7 +13,16 @@ mod test_setup {
         let contract_id = e.register(ReferralContract, {});
         let client = ReferralContractClient::new(e, &contract_id);
 
-        e.mock_all_auths();
+        // Mock auth for initialization
+        e.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (admin.clone(), token.address()).into_val(e),
+                sub_invokes: &[],
+            },
+        }]);
 
         // Initialize first
         let _ = client.initialize(&admin, &token.address());
@@ -25,6 +34,17 @@ mod test_setup {
             level3: 100, // 1%
             max_reward_per_referral: 1000000,
         };
+
+        // Mock auth for setting reward rates
+        e.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "set_reward_rates",
+                args: (rates.clone(),).into_val(e),
+                sub_invokes: &[],
+            },
+        }]);
 
         client.set_reward_rates(&rates);
 
@@ -142,6 +162,14 @@ mod test_critical_auth_bypass_vulnerability {
         
         // This should FAIL (panic) but currently SUCCEEDS due to vulnerability
         contract.add_milestone(&malicious_milestone);
+        
+        // Verify the milestone was actually stored (proving the vulnerability)
+        // The milestone should be stored at ID 0 since it's the first one
+        let stored_milestone: Milestone = env.as_contract(&contract.address, || {
+            env.storage().instance().get(&DataKey::Milestone(0)).unwrap()
+        });
+        assert_eq!(stored_milestone.reward_amount, 999999);
+        assert_eq!(stored_milestone.description, String::from_str(&env, "Malicious milestone"));
     }
 
     #[test]
@@ -205,14 +233,50 @@ mod test_critical_level_manipulation_vulnerability {
         let victim_user = Address::generate(&env);
         let attacker = Address::generate(&env);
 
-       
-
         // Register victim user with admin as referrer
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &victim_user,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (victim_user.clone(), admin.clone(), String::from_str(&env, "proof123")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&victim_user, &admin, &String::from_str(&env, "proof123"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "approve_verification",
+                args: (victim_user.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.approve_verification(&victim_user);
 
         // Register attacker separately
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &attacker,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (attacker.clone(), admin.clone(), String::from_str(&env, "proof456")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&attacker, &admin, &String::from_str(&env, "proof456"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "approve_verification",
+                args: (attacker.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.approve_verification(&attacker);
 
         // Verify victim starts at Basic level
@@ -267,12 +331,49 @@ mod test_critical_reward_distribution_vulnerability {
         let malicious_user = Address::generate(&env);
         let victim_user = Address::generate(&env);
 
-        env.mock_all_auths();
-
         // Register both users
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &victim_user,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (victim_user.clone(), admin.clone(), String::from_str(&env, "proof123")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&victim_user, &admin, &String::from_str(&env, "proof123"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "approve_verification",
+                args: (victim_user.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.approve_verification(&victim_user);
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &malicious_user,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (malicious_user.clone(), admin.clone(), String::from_str(&env, "proof456")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&malicious_user, &admin, &String::from_str(&env, "proof456"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "approve_verification",
+                args: (malicious_user.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.approve_verification(&malicious_user);
 
         // Verify victim starts with 0 rewards
@@ -318,10 +419,27 @@ mod test_critical_reward_distribution_vulnerability {
         // Create attacker
         let attacker = Address::generate(&env);
 
-        env.mock_all_auths();
-
         // Register attacker with admin as referrer
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &attacker,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (attacker.clone(), admin.clone(), String::from_str(&env, "proof456")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&attacker, &admin, &String::from_str(&env, "proof456"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "approve_verification",
+                args: (attacker.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.approve_verification(&attacker);
 
         // Verify attacker starts with 0 rewards
@@ -386,8 +504,37 @@ mod test_critical_reward_distribution_vulnerability {
 
 
         // Register attacker and their addresses
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &attacker,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (attacker.clone(), admin.clone(), String::from_str(&env, "proof123")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&attacker, &admin, &String::from_str(&env, "proof123"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &attacker_address1,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (attacker_address1.clone(), admin.clone(), String::from_str(&env, "proof124")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&attacker_address1, &admin, &String::from_str(&env, "proof124"));
+        
+        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+            address: &attacker_address2,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract.address,
+                fn_name: "register_with_referral",
+                args: (attacker_address2.clone(), admin.clone(), String::from_str(&env, "proof125")).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         contract.register_with_referral(&attacker_address2, &admin, &String::from_str(&env, "proof125"));
 
         // CRITICAL VULNERABILITY: Attacker exploits admin functions with admin's signature

@@ -1,5 +1,3 @@
-
-
 # 🔒 Security Audit Report: StarShop Referral Contract
 
 ## Executive Summary
@@ -29,7 +27,7 @@ This security audit has identified **8 critical vulnerabilities** in the StarSho
 ### 1. Authorization Bypass - set_reward_rates
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-001  
+**CVE:** CVE-2025-XXXX-001  
 **CVSS Score:** 9.8 (Critical)
 
 #### Description
@@ -56,7 +54,7 @@ pub fn verify_admin(env: &Env) -> Result<(), Error> {
 ### 2. Authorization Bypass - pause_contract
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-002  
+**CVE:** CVE-2025-XXXX-002  
 **CVSS Score:** 9.8 (Critical)
 
 #### Description
@@ -73,7 +71,7 @@ Same as vulnerability #1 - lack of caller identity verification in authorization
 ### 3. Authorization Bypass - transfer_admin
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-003  
+**CVE:** CVE-2025-XXXX-003  
 **CVSS Score:** 10.0 (Critical)
 
 #### Description
@@ -90,7 +88,7 @@ Same authorization bypass pattern affecting all admin functions.
 ### 4. Authorization Bypass - add_milestone
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-004  
+**CVE:** CVE-2025-XXXX-004  
 **CVSS Score:** 9.8 (Critical)
 
 #### Description
@@ -107,7 +105,7 @@ Same authorization bypass vulnerability affecting admin functions.
 ### 5. Social Engineering Attack Vector
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-005  
+**CVE:** CVE-2025-XXXX-005  
 **CVSS Score:** 9.9 (Critical)
 
 #### Description
@@ -127,7 +125,7 @@ The contract's authorization model is vulnerable to social engineering attacks w
 ### 6. Level Manipulation Vulnerability
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-006  
+**CVE:** CVE-2025-XXXX-006  
 **CVSS Score:** 9.8 (Critical)
 
 #### Description
@@ -204,7 +202,7 @@ fn test_different_address_can_update_level() {
 ### 7. Reward Distribution Bypass Vulnerability
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-007  
+**CVE:** CVE-2025-XXXX-007  
 **CVSS Score:** 9.8 (Critical)
 
 #### Description
@@ -296,7 +294,7 @@ fn test_mass_reward_drainage_attack() {
 ### 8. Privilege Escalation Attack Vulnerability
 
 **Severity:** CRITICAL  
-**CVE:** CVE-2024-XXXX-008  
+**CVE:** CVE-2025-XXXX-008  
 **CVSS Score:** 10.0 (Critical)
 
 #### Description
@@ -401,7 +399,7 @@ fn test_admin_function_exploitation_privilege_escalation() {
 
 ## 🧪 Proof of Concept (POC)
 
-The following POC code demonstrates all 5 critical vulnerabilities:
+The following POC code demonstrates all 8 critical vulnerabilities:
 
 ```rust
 #![cfg(test)]
