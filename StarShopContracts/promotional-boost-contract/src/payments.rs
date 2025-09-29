@@ -40,8 +40,9 @@ impl PaymentProcessor {
         let base_price = 5_000_000i128; // 5 XLM in stroops (1 XLM = 1_000_000 stroops)
         let daily_rate = base_price; // per day rate
 
-        let days = (duration_secs as f64 / 86400.0) as i128;
-        days * daily_rate
+        // Calculate days using integer arithmetic (86400 seconds = 1 day)
+        let days = duration_secs / 86400;
+        (days as i128) * daily_rate
     }
 
     /// Gets the XLM token address - in production this would be the native XLM,
