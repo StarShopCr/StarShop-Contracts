@@ -13,6 +13,7 @@ members = [
     "StarShopContracts/payment-escrow-contract",
     "StarShopContracts/product-follow-contract",
     "StarShopContracts/product-voting-contract",
+    "StarShopContracts/promotion-nft-contract",
     "StarShopContracts/promotional-boost-contract",
     "StarShopContracts/referral-contract",
     "StarShopContracts/subscription-system-contract",
