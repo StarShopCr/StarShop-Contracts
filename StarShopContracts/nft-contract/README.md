@@ -68,16 +68,18 @@ stellar contract build
 ```sh
 stellar contract optimize --wasm target/wasm32-unknown-unknown/release/implement-nft-contract.wasm
 ```
-
+ 
 ### 🚀 Deployment  
-Refer to the official Stellar CLI documentation for detailed deployment instructions. Ensure that:  
 
-- The contract is properly compiled.  
-- A valid testnet account is configured.  
-- The contract is deployed and registered using:  
+*✅ TESTNET DEPLOYED* - Contract successfully deployed to Stellar Testnet!
+
+- *Contract ID:* CAYG7S3772Y2QLRCEZO6SZJAWRDOGBTMQSGQNDBYTSNG2P35BDXM6UCR
+- *Network:* Stellar Testnet
+- *Status:* Ready for testing
+- *Explorer:* [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYG7S3772Y2QLRCEZO6SZJAWRDOGBTMQSGQNDBYTSNG2P35BDXM6UCR) 
 
 ```sh
-stellar contract deploy
+stellar contract deploy --source-account <identity> --network testnet --wasm <path-to-wasm>
 ```
 
 ### 🧪 Testing
