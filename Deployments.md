@@ -1,24 +1,34 @@
-# Governance
-Contract-id: `CD7RBVBX6XJDYGTEPRQNBCO5OBAIUCT7KEEJ7VQFNU6WGDVPQFJNE2XP`
-# Subscription
-Contract-id: `CC3FEA5X6W5CYRXQGKRF33T5R4PH65DX7HLLLEW74SQWYYFNSBGDP65A`
-# Crowdfunding-collective contract
-Contract-id : CBFHIE24DRXCLMH74UT7FYL3ZDVSAZTYU6EDRE3SG64NJKWI7CCIQVGV
-# Payment
-Contract-id: `CAVZ44XO3MJLBYQKOVK67BKNBGBF2IJTWHRJIUREZASVUMFVV7LJ6BNT`
-# Airdrop contract
-Contract-id : CBIVVRV6JAAMQ437GZQVB5NZ52IB7WEHCQQX54OXXBEZHVCXWQIMZN3A
-# Example contract
-Contract-id : CCKWNWN4TEVEMX4E6TA2IRHBNU623WJ64YQ4ACYTTVIS473FHZRHWFES
-# Limited time drop
-Contract-id : CB5UTJBWXNGZATAK3OLHYPCKKS7RCFNNBZAW3D2IJYR42GCM7LE4HZTQ
-# loyalty_rewards_contract
- Contract-id : CD6LKQC3AAMVBTLYBM34ZIASL6V5EWT3XGK3QOWWLABITIT37OVM7OQN
-# Multi-auction
-Contract-id : CDGFI4FASFTB5R2T3W4D3OBATV2DWFOKYEJKXQ2BT3ARSYU4U63BXCBZ
-# Payment Escrow contract
-Contract-id : CCUOJJWNUCDQGPDM7CZWG3PC5FS6EO5E4Y75YO6BX37OOCXZ3DPAKYII
-# Product voting contract
-Contract-id : CCCQC3GLDJE7ZG42RN3QMOKHBWX4U2QIABF5RWBDAGV3KUOFLBQWPJU6
-# Promotional boost contract
-Contract-id : CCGFHDTU6DU4ZY4VUZ6H6K6X4GI6FZ5DW34MPZGDEZ6UDZWJ4CEHKSA6
+# Stellar Testnet Deployments - StarShop Contracts
+
+> ⚠️ Test Environment Only - Stellar Testnet
+> Source Account: `alice`
+> Network: testnet
+
+This file tracks the deployment of all smart contracts under `StarShopContracts/` to Stellar Testnet.
+
+## Deployment Process
+
+Each contract is built and deployed with:
+
+```bash
+stellar contract build
+stellar contract deploy \
+  --wasm target/wasm32-unknown-unknown/release/<contract_name>.wasm \
+  --source alice \
+  --network testnet
+```
+
+## Deployed Contracts
+
+| Contract | Path | Contract ID | Deployed At | Status |
+|----------|------|-------------|-------------|--------|
+| starshop-core | StarShopContracts/starshop-core | `CA...` | - | Pending |
+| starshop-marketplace | StarShopContracts/starshop-marketplace | `CA...` | - | Pending |
+| starshop-token | StarShopContracts/starshop-token | `CA...` | - | Pending |
+| starshop-nft | StarShopContracts/starshop-nft | `CA...` | - | Pending |
+| starshop-escrow | StarShopContracts/starshop-escrow | `CA...` | - | Pending |
+
+### Notes
+- All deployments are for testing purposes only, not production.
+- Contract IDs must be updated after each successful deployment.
+- Each contract has its own sub-issue for tracking.
