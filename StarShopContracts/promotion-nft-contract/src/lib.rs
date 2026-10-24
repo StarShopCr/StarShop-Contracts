@@ -99,3 +99,7 @@ impl NonFungibleToken for StarshopPromoNFT {
         Base::token_uri(e, token_id)
     }
 }
+
+#[cfg(test)]
+mod test;
+
