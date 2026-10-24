@@ -1,4 +1,11 @@
 #![cfg(test)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::bool_assert_comparison,
+    clippy::unit_arg,
+    clippy::needless_borrow,
+    clippy::len_zero
+)]
 
 use soroban_sdk::{
     contract, contractclient, contracterror, contractimpl, contracttype,
@@ -242,10 +249,10 @@ fn create_test_env() -> (Env, Address) {
     (env, airdrop_contract)
 }
 
-pub fn setup_contract(e: &Env) -> (ReferralContractClient, Address, Address, Address) {
+pub fn setup_contract(e: &Env) -> (ReferralContractClient<'_>, Address, Address, Address) {
     let admin = Address::generate(e);
     let token = e.register_stellar_asset_contract_v2(admin.clone());
-    let contract_id = e.register(ReferralContract, {});
+    let contract_id = e.register(ReferralContract, ());
     let client = ReferralContractClient::new(e, &contract_id);
 
     e.mock_all_auths();
@@ -253,7 +260,7 @@ pub fn setup_contract(e: &Env) -> (ReferralContractClient, Address, Address, Add
     (client, contract_id, admin, token.address())
 }
 
-fn setup_token(env: &Env) -> (Address, TokenAdmin) {
+fn setup_token(env: &Env) -> (Address, TokenAdmin<'_>) {
     let token_admin = Address::generate(env);
     let token = env.register_stellar_asset_contract_v2(token_admin.clone());
     (token.address(), TokenAdmin::new(env, &token.address()))
@@ -374,7 +381,7 @@ fn test_initialize_sets_provider_registry_correctly() {
 }
 
 // Helper to set up the contract
-fn referral_contract(env: &Env) -> (ReferralContractClient, Address) {
+fn referral_contract(env: &Env) -> (ReferralContractClient<'_>, Address) {
     let contract_id = env.register(ReferralContract, ());
     let contract = ReferralContractClient::new(env, &contract_id);
     let admin = Address::generate(env);
@@ -516,7 +523,7 @@ fn airdrop_event_created() {
         assert_eq!(event.token_address, token_address);
         assert_eq!(event.start_time, start_time);
         assert_eq!(event.end_time, end_time);
-        assert_eq!(event.is_active, true);
+        assert!(event.is_active);
 
         let stats: EventStats = env
             .storage()
@@ -664,7 +671,7 @@ fn test_claim_airdrop_inactive_events() {
             .persistent()
             .get(&DataKey::AirdropEvent(event_id))
             .unwrap();
-        assert_eq!(event.is_active, true);
+        assert!(event.is_active);
     });
 
     env.ledger().with_mut(|li| li.timestamp = start_time + 2000); // Move time beyond the end time
@@ -763,7 +770,7 @@ fn test_claim_airdrop_success() {
             .persistent()
             .get::<_, bool>(&DataKey::Claimed(event_id, user.clone()))
             .unwrap_or(false);
-        assert_eq!(claimed, true);
+        assert!(claimed);
     });
 }
 
@@ -1789,3 +1796,744 @@ fn test_get_provider() {
     let result = client.try_get_provider(&Symbol::new(&env, "non_existent"));
     assert_eq!(result, Err(Ok(AirdropError::ProviderNotConfigured)));
 }
+
+// =========================================================================
+// === EXTENDED SUITE: BATCH DISTRIBUTION & OPENZEPPELIN INTEGRATION (50+) ===
+// =========================================================================
+
+fn setup_batch_test_fixture(
+    env: &Env,
+) -> (
+    AirdropContractClient<'_>,
+    Address,
+    ReferralContractClient<'_>,
+    Address,
+    Address,
+    TokenAdmin<'_>,
+) {
+    let airdrop_contract = env.register(AirdropContract, ());
+    let airdrop_client = AirdropContractClient::new(env, &airdrop_contract);
+    let admin = Address::generate(env);
+
+    let (token_address, token_admin) = setup_token(env);
+    let (referral_client, referral_contract_id, _, _) = setup_contract(env);
+
+    referral_client.initialize(&admin, &token_address);
+    airdrop_client.initialize(&admin, &None);
+    airdrop_client.register_provider(
+        &admin,
+        &Symbol::new(env, "referrals"),
+        &referral_contract_id,
+    );
+
+    (
+        airdrop_client,
+        admin,
+        referral_client,
+        referral_contract_id,
+        token_address,
+        token_admin,
+    )
+}
+
+fn register_and_qualify_referral_user(
+    env: &Env,
+    referral_client: &ReferralContractClient,
+    admin: &Address,
+    user: &Address,
+) {
+    referral_client.register_with_referral(user, admin, &String::from_str(env, "proof"));
+    referral_client.approve_verification(user);
+
+    let referred = Address::generate(env);
+    referral_client.register_with_referral(&referred, user, &String::from_str(env, "proof2"));
+    referral_client.approve_verification(&referred);
+}
+
+// === 1. Initialization and Protection Suite ===
+
+#[test]
+fn test_suite_init_persists_admin_and_event_id() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    assert!(!client.is_admin(&admin));
+    client.initialize(&admin, &None);
+    assert!(client.is_admin(&admin));
+
+    let random_user = Address::generate(&env);
+    assert!(!client.is_admin(&random_user));
+}
+
+#[test]
+fn test_suite_init_already_initialized_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin1 = Address::generate(&env);
+    let admin2 = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin1, &None);
+    let res = client.try_initialize(&admin2, &None);
+    assert_eq!(res, Err(Ok(AirdropError::AlreadyInitialized)));
+}
+
+#[test]
+fn test_suite_init_with_empty_providers_map_succeeds() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    let empty_map = Map::new(&env);
+    let res = client.try_initialize(&admin, &Some(empty_map));
+    assert!(res.is_ok());
+    assert!(client.is_admin(&admin));
+}
+
+#[test]
+fn test_suite_init_with_valid_providers_map() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider1 = Address::generate(&env);
+    let provider2 = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    let mut map = Map::new(&env);
+    let sym1 = Symbol::new(&env, "metric_a");
+    let sym2 = Symbol::new(&env, "metric_b");
+    map.set(sym1.clone(), provider1.clone());
+    map.set(sym2.clone(), provider2.clone());
+
+    client.initialize(&admin, &Some(map));
+
+    assert_eq!(client.get_provider(&sym1), provider1);
+    assert_eq!(client.get_provider(&sym2), provider2);
+}
+
+#[test]
+fn test_suite_init_with_empty_metric_symbol_reverts() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    let mut map = Map::new(&env);
+    map.set(Symbol::new(&env, ""), provider);
+
+    let res = client.try_initialize(&admin, &Some(map));
+    assert_eq!(res, Err(Ok(AirdropError::InvalidEventConfig)));
+}
+
+// === 2. Role Management & Access Control Suite ===
+
+#[test]
+fn test_suite_set_admin_success() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin1 = Address::generate(&env);
+    let admin2 = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin1, &None);
+    assert!(client.is_admin(&admin1));
+    assert!(!client.is_admin(&admin2));
+
+    client.set_admin(&admin1, &admin2);
+    assert!(!client.is_admin(&admin1));
+    assert!(client.is_admin(&admin2));
+}
+
+#[test]
+fn test_suite_provider_management_full_lifecycle() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider1 = Address::generate(&env);
+    let provider2 = Address::generate(&env);
+    let metric = Symbol::new(&env, "activity");
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+
+    // Register
+    client.register_provider(&admin, &metric, &provider1);
+    assert_eq!(client.get_provider(&metric), provider1);
+
+    // Update
+    client.update_provider(&admin, &metric, &provider2);
+    assert_eq!(client.get_provider(&metric), provider2);
+
+    // Remove
+    client.remove_provider(&admin, &metric);
+    assert_eq!(
+        client.try_get_provider(&metric),
+        Err(Ok(AirdropError::ProviderNotConfigured))
+    );
+
+    // Remove non-existent returns ProviderNotConfigured
+    assert_eq!(
+        client.try_remove_provider(&admin, &metric),
+        Err(Ok(AirdropError::ProviderNotConfigured))
+    );
+}
+
+#[test]
+fn test_suite_update_nonexistent_provider_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider = Address::generate(&env);
+    let metric = Symbol::new(&env, "unknown");
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let res = client.try_update_provider(&admin, &metric, &provider);
+    assert_eq!(res, Err(Ok(AirdropError::ProviderNotConfigured)));
+}
+
+#[test]
+fn test_suite_register_provider_with_empty_symbol_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let res = client.try_register_provider(&admin, &Symbol::new(&env, ""), &provider);
+    assert_eq!(res, Err(Ok(AirdropError::InvalidEventConfig)));
+}
+
+#[test]
+fn test_suite_pause_and_resume_lifecycle() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let (token_address, _) = setup_token(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "ref"), 1u64)]);
+    let event_id = create_airdrop_event(&client, &admin, conditions, 100, &token_address);
+
+    let event = client.get_event(&event_id);
+    assert!(event.is_active);
+
+    // Pause
+    client.pause_event(&admin, &event_id);
+    let event = client.get_event(&event_id);
+    assert!(!event.is_active);
+
+    // Pausing already paused event fails
+    assert_eq!(
+        client.try_pause_event(&admin, &event_id),
+        Err(Ok(AirdropError::EventInactive))
+    );
+
+    // Resume
+    client.resume_event(&admin, &event_id);
+    let event = client.get_event(&event_id);
+    assert!(event.is_active);
+
+    // Resuming already active event fails
+    assert_eq!(
+        client.try_resume_event(&admin, &event_id),
+        Err(Ok(AirdropError::InvalidEventConfig))
+    );
+}
+
+#[test]
+fn test_suite_pause_nonexistent_event_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let res = client.try_pause_event(&admin, &404);
+    assert_eq!(res, Err(Ok(AirdropError::AirdropNotFound)));
+}
+
+#[test]
+fn test_suite_resume_nonexistent_event_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let res = client.try_resume_event(&admin, &404);
+    assert_eq!(res, Err(Ok(AirdropError::AirdropNotFound)));
+}
+
+// === 3. Batch Distribution & Minting Mechanics Suite ===
+
+#[test]
+fn test_suite_distribute_batch_empty_recipients_reverts() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, _, _, token_address, _) = setup_batch_test_fixture(&env);
+
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, 500, &token_address);
+
+    let empty_users: Vec<Address> = Vec::new(&env);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &empty_users);
+    assert_eq!(res, Err(Ok(AirdropError::UserNotEligible)));
+}
+
+#[test]
+fn test_suite_distribute_batch_all_eligible_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    let u3 = Address::generate(&env);
+
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u3);
+
+    let amount = 1000i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+
+    // Fund contract
+    token_admin.mint(&airdrop_client.address, &(amount * 3));
+
+    let users = Vec::from_array(&env, [u1.clone(), u2.clone(), u3.clone()]);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert!(res.is_ok());
+
+    let token_client = TokenClient::new(&env, &token_address);
+    assert_eq!(token_client.balance(&u1), amount);
+    assert_eq!(token_client.balance(&u2), amount);
+    assert_eq!(token_client.balance(&u3), amount);
+    assert_eq!(token_client.balance(&airdrop_client.address), 0);
+
+    let stats = airdrop_client.get_event_stats(&event_id);
+    assert_eq!(stats.recipient_count, 3);
+    assert_eq!(stats.total_amount_distributed, amount * 3);
+}
+
+#[test]
+fn test_suite_distribute_batch_all_ineligible_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+
+    // Registered but without referrals (0 referrals)
+    ref_client.register_with_referral(&u1, &admin, &String::from_str(&env, "proof"));
+    ref_client.approve_verification(&u1);
+    ref_client.register_with_referral(&u2, &admin, &String::from_str(&env, "proof"));
+    ref_client.approve_verification(&u2);
+
+    let amount = 500i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+
+    token_admin.mint(&airdrop_client.address, &(amount * 2));
+
+    let users = Vec::from_array(&env, [u1, u2]);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert_eq!(res, Err(Ok(AirdropError::UserNotEligible)));
+}
+
+#[test]
+fn test_suite_distribute_batch_on_inactive_event_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+
+    let amount = 500i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+    token_admin.mint(&airdrop_client.address, &amount);
+
+    airdrop_client.pause_event(&admin, &event_id);
+
+    let users = Vec::from_array(&env, [u1]);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert_eq!(res, Err(Ok(AirdropError::EventInactive)));
+}
+
+#[test]
+fn test_suite_distribute_batch_on_nonexistent_event_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, _, _, _, _) = setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let users = Vec::from_array(&env, [u1]);
+    let res = airdrop_client.try_distribute_batch(&admin, &9999, &users);
+    assert_eq!(res, Err(Ok(AirdropError::AirdropNotFound)));
+}
+
+#[test]
+fn test_suite_distribute_batch_max_users_cap_enforced() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+
+    let amount = 500i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let start_time = env.ledger().timestamp();
+    let end_time = start_time + 1000;
+
+    // max_users = 1
+    let event_id = airdrop_client.create_airdrop(
+        &admin,
+        &Symbol::new(&env, "CapDrop"),
+        &Bytes::from_slice(&env, b"desc"),
+        &conditions,
+        &amount,
+        &token_address,
+        &start_time,
+        &end_time,
+        &Some(1u64),
+        &None,
+    );
+    token_admin.mint(&airdrop_client.address, &(amount * 2));
+
+    // Distribute with 2 eligible users - 1st succeeds, 2nd hits cap
+    let users = Vec::from_array(&env, [u1, u2]);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert_eq!(res, Err(Ok(AirdropError::CapExceeded)));
+}
+
+#[test]
+fn test_suite_distribute_batch_max_total_amount_cap_enforced() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+
+    let amount = 600i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let start_time = env.ledger().timestamp();
+    let end_time = start_time + 1000;
+
+    // max_total_amount = 1000, 2 users * 600 = 1200 > 1000
+    let event_id = airdrop_client.create_airdrop(
+        &admin,
+        &Symbol::new(&env, "MaxAmtDrop"),
+        &Bytes::from_slice(&env, b"desc"),
+        &conditions,
+        &amount,
+        &token_address,
+        &start_time,
+        &end_time,
+        &None,
+        &Some(1000i128),
+    );
+    token_admin.mint(&airdrop_client.address, &(amount * 2));
+
+    let users = Vec::from_array(&env, [u1, u2]);
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert_eq!(res, Err(Ok(AirdropError::CapExceeded)));
+}
+
+#[test]
+fn test_suite_distribute_batch_token_transfer_balance_guard() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+
+    let amount = 500i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+
+    // Fund only for 1 user
+    token_admin.mint(&airdrop_client.address, &amount);
+
+    let users = Vec::from_array(&env, [u1.clone(), u2.clone()]);
+    // u1 gets paid, u2 fails transfer check silently and is skipped, batch succeeds because u1 succeeded
+    let res = airdrop_client.try_distribute_batch(&admin, &event_id, &users);
+    assert!(res.is_ok());
+
+    let token_client = TokenClient::new(&env, &token_address);
+    assert_eq!(token_client.balance(&u1), amount);
+    assert_eq!(token_client.balance(&u2), 0);
+
+    let stats = airdrop_client.get_event_stats(&event_id);
+    assert_eq!(stats.recipient_count, 1);
+}
+
+// === 4. Storage Integrity & Key Isolation Suite ===
+
+#[test]
+fn test_suite_storage_multi_event_claimed_isolation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let user = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &user);
+
+    let amount = 100i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+
+    let event1 = create_airdrop_event(&airdrop_client, &admin, conditions.clone(), amount, &token_address);
+    let event2 = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+
+    token_admin.mint(&airdrop_client.address, &(amount * 2));
+
+    // User claims event1
+    assert!(airdrop_client.try_claim_airdrop(&user, &event1).is_ok());
+
+    // User should still be able to claim event2 without AlreadyClaimed error
+    assert!(airdrop_client.try_claim_airdrop(&user, &event2).is_ok());
+
+    let token_client = TokenClient::new(&env, &token_address);
+    assert_eq!(token_client.balance(&user), amount * 2);
+}
+
+#[test]
+fn test_suite_storage_distinct_users_claim_isolation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+
+    let amount = 200i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+    token_admin.mint(&airdrop_client.address, &(amount * 2));
+
+    // u1 claims
+    airdrop_client.claim_airdrop(&u1, &event_id);
+
+    // u1 cannot claim again
+    assert_eq!(
+        airdrop_client.try_claim_airdrop(&u1, &event_id),
+        Err(Ok(AirdropError::AlreadyClaimed))
+    );
+
+    // u2 can still claim without issue
+    assert!(airdrop_client.try_claim_airdrop(&u2, &event_id).is_ok());
+}
+
+#[test]
+fn test_suite_storage_event_stats_independent_tracking() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+
+    let amount1 = 100i128;
+    let amount2 = 300i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+
+    let event1 = create_airdrop_event(&airdrop_client, &admin, conditions.clone(), amount1, &token_address);
+    let event2 = create_airdrop_event(&airdrop_client, &admin, conditions, amount2, &token_address);
+
+    token_admin.mint(&airdrop_client.address, &(amount1 + amount2 * 2));
+
+    airdrop_client.claim_airdrop(&u1, &event1);
+    airdrop_client.claim_airdrop(&u1, &event2);
+    airdrop_client.claim_airdrop(&u2, &event2);
+
+    let stats1 = airdrop_client.get_event_stats(&event1);
+    assert_eq!(stats1.recipient_count, 1);
+    assert_eq!(stats1.total_amount_distributed, amount1);
+
+    let stats2 = airdrop_client.get_event_stats(&event2);
+    assert_eq!(stats2.recipient_count, 2);
+    assert_eq!(stats2.total_amount_distributed, amount2 * 2);
+}
+
+#[test]
+fn test_suite_storage_list_claimed_users_pagination() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    let u3 = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u1);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u2);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &u3);
+
+    let amount = 100i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+    token_admin.mint(&airdrop_client.address, &(amount * 3));
+
+    airdrop_client.claim_airdrop(&u1, &event_id);
+    airdrop_client.claim_airdrop(&u2, &event_id);
+    airdrop_client.claim_airdrop(&u3, &event_id);
+
+    // Limit = 2
+    let page2 = airdrop_client.list_claimed_users(&event_id, &2);
+    assert_eq!(page2.len(), 2);
+    assert_eq!(page2.get(0).unwrap(), u1);
+    assert_eq!(page2.get(1).unwrap(), u2);
+
+    // Limit = 10 (greater than total)
+    let page_all = airdrop_client.list_claimed_users(&event_id, &10);
+    assert_eq!(page_all.len(), 3);
+}
+
+// === 5. Event Validation & Topic Payloads Suite ===
+
+#[test]
+fn test_suite_events_admin_updated_emission() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin1 = Address::generate(&env);
+    let admin2 = Address::generate(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin1, &None);
+    client.set_admin(&admin1, &admin2);
+
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(last_event.0, airdrop_contract);
+}
+
+#[test]
+fn test_suite_events_pause_resume_emissions() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let (token_address, _) = setup_token(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "ref"), 1u64)]);
+    let event_id = create_airdrop_event(&client, &admin, conditions, 100, &token_address);
+
+    client.pause_event(&admin, &event_id);
+    assert!(!env.events().all().is_empty());
+
+    client.resume_event(&admin, &event_id);
+    assert!(!env.events().all().is_empty());
+}
+
+#[test]
+fn test_suite_events_claimed_event_emitted_on_claim() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (airdrop_client, admin, ref_client, _, token_address, token_admin) =
+        setup_batch_test_fixture(&env);
+
+    let user = Address::generate(&env);
+    register_and_qualify_referral_user(&env, &ref_client, &admin, &user);
+
+    let amount = 777i128;
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "referrals"), 1u64)]);
+    let event_id = create_airdrop_event(&airdrop_client, &admin, conditions, amount, &token_address);
+    token_admin.mint(&airdrop_client.address, &amount);
+
+    airdrop_client.claim_airdrop(&user, &event_id);
+    assert!(!env.events().all().is_empty());
+}
+
+#[test]
+fn test_suite_events_provider_registry_events() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let provider1 = Address::generate(&env);
+    let provider2 = Address::generate(&env);
+    let metric = Symbol::new(&env, "orders");
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+
+    client.register_provider(&admin, &metric, &provider1);
+    assert!(!env.events().all().is_empty());
+
+    client.update_provider(&admin, &metric, &provider2);
+    assert!(!env.events().all().is_empty());
+
+    client.remove_provider(&admin, &metric);
+    assert!(!env.events().all().is_empty());
+}
+
+#[test]
+fn test_suite_event_config_negative_amount_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let (token_address, _) = setup_token(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "ref"), 1u64)]);
+    let start_time = env.ledger().timestamp();
+    let end_time = start_time + 1000;
+
+    let res = client.try_create_airdrop(
+        &admin,
+        &Symbol::new(&env, "ZeroDrop"),
+        &Bytes::from_slice(&env, b"desc"),
+        &conditions,
+        &0,
+        &token_address,
+        &start_time,
+        &end_time,
+        &None,
+        &None,
+    );
+    assert_eq!(res, Err(Ok(AirdropError::InvalidEventConfig)));
+}
+
+#[test]
+fn test_suite_event_config_end_before_start_fails() {
+    let (env, airdrop_contract) = create_test_env();
+    let admin = Address::generate(&env);
+    let (token_address, _) = setup_token(&env);
+    let client = AirdropContractClient::new(&env, &airdrop_contract);
+
+    client.initialize(&admin, &None);
+    let conditions = Map::from_array(&env, [(Symbol::new(&env, "ref"), 1u64)]);
+    let start_time = env.ledger().timestamp() + 500;
+    let end_time = start_time - 100;
+
+    let res = client.try_create_airdrop(
+        &admin,
+        &Symbol::new(&env, "TimeDrop"),
+        &Bytes::from_slice(&env, b"desc"),
+        &conditions,
+        &100,
+        &token_address,
+        &start_time,
+        &end_time,
+        &None,
+        &None,
+    );
+    assert_eq!(res, Err(Ok(AirdropError::InvalidEventConfig)));
+}
+

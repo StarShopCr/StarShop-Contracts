@@ -69,7 +69,7 @@ pub fn claim_tokens(env: Env, user: Address, event_id: u64) -> Result<(), Airdro
         }
     }
     if let Some(max_total) = airdrop_event.max_total_amount {
-        if stats.total_amount_distributed as i128 + airdrop_event.amount > max_total {
+        if stats.total_amount_distributed + airdrop_event.amount > max_total {
             return Err(AirdropError::CapExceeded);
         }
     }
@@ -171,7 +171,7 @@ pub fn distribute_batch(
             }
         }
         if let Some(max_total) = airdrop_event.max_total_amount {
-            if stats.total_amount_distributed as i128 + airdrop_event.amount > max_total {
+            if stats.total_amount_distributed + airdrop_event.amount > max_total {
                 return Err(AirdropError::CapExceeded);
             }
         }

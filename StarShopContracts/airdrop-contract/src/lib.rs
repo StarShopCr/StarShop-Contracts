@@ -1,4 +1,9 @@
 #![no_std]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::len_zero,
+    clippy::needless_borrow
+)]
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Map, Symbol, Vec};
 
 mod distribution;
