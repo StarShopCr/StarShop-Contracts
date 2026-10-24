@@ -51,12 +51,51 @@ system with reward tracking, commission distribution, and user verification.
 - Rust toolchain
 - Soroban CLI
 
-## 🛠 Setup
+## 🛠 Setup & Build
 
-1. Install dependencies:
+1. Build for local development & testing:
+```bash
+cargo build -p referral-contract
+```
+
+2. Build WASM bytecode for deployment:
+```bash
+cargo build -p referral-contract --release --target wasm32-unknown-unknown
+```
+
+## 🚀 Testnet Deployment (Test-Only)
+
+This contract is deployed and configured on the **Stellar Testnet** for testing and staging integration verification.
+
+### Deployment Details
+- **Network:** Stellar Testnet
+- **Network Passphrase:** `Test SDF Network ; September 2015`
+- **RPC URL:** `https://soroban-testnet.stellar.org`
+- **Contract ID:** `CCHXSA6WFERL3VE4K4TEHFYOYIEFIP5CXWY6OGMKUHXBQG3HTRCMZRO6`
+- **Status:** Test-Only (Staging Verification)
+- **Explorer:** [StellarExpert Testnet Contract](https://stellar.expert/explorer/testnet/contract/CCHXSA6WFERL3VE4K4TEHFYOYIEFIP5CXWY6OGMKUHXBQG3HTRCMZRO6)
+
+### Deployment Script & Dry-Run
+
+The deployment artifact and script are available in `deploy_testnet.sh`:
 
 ```bash
-make build
+# Verify WASM artifact and testnet parameters
+./StarShopContracts/referral-contract/deploy_testnet.sh --dry-run
+```
+
+### Contract Initialization
+
+To initialize the deployed contract on Testnet:
+
+```bash
+stellar contract invoke \
+    --id CCHXSA6WFERL3VE4K4TEHFYOYIEFIP5CXWY6OGMKUHXBQG3HTRCMZRO6 \
+    --source <ADMIN_SECRET_OR_IDENTITY> \
+    --network testnet \
+    -- initialize \
+    --admin <ADMIN_ADDRESS> \
+    --reward_token <REWARD_TOKEN_ADDRESS>
 ```
 
 ## 📝 Contract Interface

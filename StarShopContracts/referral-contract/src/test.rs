@@ -6,7 +6,7 @@ use soroban_sdk::{testutils::Address as _, Address, Env};
 mod test_setup {
     use super::*;
 
-    pub fn setup_contract(e: &Env) -> (ReferralContractClient, Address, Address) {
+    pub fn setup_contract(e: &Env) -> (ReferralContractClient<'_>, Address, Address) {
         let admin = Address::generate(e);
         let token = e.register_stellar_asset_contract_v2(admin.clone());
         let contract_id = e.register(ReferralContract, {});
