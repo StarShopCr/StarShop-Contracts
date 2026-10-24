@@ -36,21 +36,55 @@ The Product Follow System Contract is a Stellar-based smart contract that enable
 - Stellar development environment
 - Git
 
-### Installation Steps
+### Build Steps
 
-1. Clone the repository:
-bash
-git clone https://github.com/StarShopCr/StarShop-Contracts.git
-cd StarShop-Contracts/product-follow-contract
-
-2. Build the contract:
+1. Build for local development & testing:
 ```bash
-cargo build --target wasm32-unknown-unknown --release
+cargo build -p product-follow-contract
+```
+
+2. Build WASM bytecode for deployment:
+```bash
+cargo build -p product-follow-contract --release --target wasm32-unknown-unknown
 ```
 
 3. Run tests:
 ```bash
-cargo test
+cargo test -p product-follow-contract
+```
+
+## 🚀 Testnet Deployment (Test-Only)
+
+This contract is deployed and configured on the **Stellar Testnet** for testing and staging integration verification.
+
+### Deployment Details
+- **Network:** Stellar Testnet
+- **Network Passphrase:** `Test SDF Network ; September 2015`
+- **RPC URL:** `https://soroban-testnet.stellar.org`
+- **Contract ID:** `CCS7XKR3UV76MGC2XQ4ABLMTMGOUBTG2AQ4EGAL4L5CD2OQKP4X7A66G`
+- **Status:** Test-Only (Staging Verification)
+- **Explorer:** [StellarExpert Testnet Contract](https://stellar.expert/explorer/testnet/contract/CCS7XKR3UV76MGC2XQ4ABLMTMGOUBTG2AQ4EGAL4L5CD2OQKP4X7A66G)
+
+### Deployment Script & Dry-Run
+
+The deployment artifact and script are available in `deploy_testnet.sh`:
+
+```bash
+# Verify WASM artifact and testnet parameters
+./StarShopContracts/product-follow-contract/deploy_testnet.sh --dry-run
+```
+
+### Contract Initialization
+
+To initialize the deployed contract on Testnet:
+
+```bash
+stellar contract invoke \
+    --id CCS7XKR3UV76MGC2XQ4ABLMTMGOUBTG2AQ4EGAL4L5CD2OQKP4X7A66G \
+    --source <ADMIN_SECRET_OR_IDENTITY> \
+    --network testnet \
+    -- initialize \
+    --admin <ADMIN_ADDRESS>
 ```
 
 ## 💻 Usage
