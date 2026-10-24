@@ -1,0 +1,11 @@
+mod initialization_tests;
+mod crop_registration_tests;
+mod prediction_generation_tests;
+mod prediction_retrieval_tests;
+mod data_source_update_tests;
+mod crop_information_tests;
+mod utility_tests;
+mod reporting_tests;
+mod data_types_tests;
+mod error_handling_tests;
+mod edge_case_tests;
