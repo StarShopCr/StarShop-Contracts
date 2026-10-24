@@ -1,4 +1,12 @@
 #![no_std]
+#![allow(
+    clippy::unnecessary_cast,
+    clippy::needless_borrow,
+    clippy::len_zero,
+    clippy::unnecessary_map_or,
+    clippy::needless_borrows_for_generic_args,
+    clippy::too_many_arguments
+)]
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
 use admin::*;
