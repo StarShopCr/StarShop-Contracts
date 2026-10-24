@@ -536,9 +536,9 @@ checksum = "2bfcf67fea2815c2fc3b90873fae90957be12ff417335dfadc7f52927feb03b2"
 
 [[package]]
 name = "ethnum"
-version = "1.5.0"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
+checksum = "40404c3f5f511ec4da6fe866ddf6a717c309fdbb69fbbad7b0f3edab8f2e835f"
 
 [[package]]
 name = "example-contract"
@@ -809,6 +809,13 @@ name = "nft-contract"
 version = "0.0.0"
 dependencies = [
  "getrandom",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "nft-fungible-batch-contract"
+version = "0.1.0"
+dependencies = [
  "soroban-sdk",
 ]
 
@@ -1392,9 +1399,9 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stellar-macros"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2adde9cefb70ec85d5ba5f9329a9bb5a37203e5cfed96a982eac5ec831530f28"
+checksum = "64fca0c7dec6c2ff634d0bf078bd632fd1616e4ced6be4ab1487bae689c5ebf2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1414,9 +1421,9 @@ dependencies = [
 
 [[package]]
 name = "stellar-tokens"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a310cb2e0a4693e6aff195d00e47c27c953a29a61a12a99f797104bbee727256"
+checksum = "68e41ef20c8d4f3c0b21b83a15c8e4c7e99462af020fc0f0dcd1d548a07812ea"
 dependencies = [
  "soroban-sdk",
 ]
