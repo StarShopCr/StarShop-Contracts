@@ -595,3 +595,175 @@ fn test_resolve_dispute_pay_seller() {
     let seller_balance_after = token_client.balance(&seller);
     assert_eq!(seller_balance_after, refund_amount);
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_security_deposit_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(TransactionContract, ());
+    let client = TransactionContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    client.process_deposit(&token_id, &sender, &recipient, &0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_security_deposit_negative_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(TransactionContract, ());
+    let client = TransactionContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    client.process_deposit(&token_id, &sender, &recipient, &-50);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_security_deposit_to_self() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(TransactionContract, ());
+    let client = TransactionContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let sender = Address::generate(&env);
+    client.process_deposit(&token_id, &sender, &sender, &100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn test_security_deposit_insufficient_funds() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(TransactionContract, ());
+    let client = TransactionContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let token = TokenAdmin::new(&env, &token_id);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    token.mint(&sender, &50);
+    client.process_deposit(&token_id, &sender, &recipient, &100);
+}
+
+#[test]
+#[should_panic(expected = "Unauthorized function call for address")]
+fn test_security_deposit_without_auth() {
+    let env = Env::default();
+    let contract_id = env.register(TransactionContract, ());
+    let client = TransactionContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    client.process_deposit(&token_id, &sender, &recipient, &100);
+}
+
+#[test]
+#[should_panic(expected = "Unauthorized function call for address")]
+fn test_security_refund_without_auth() {
+    let env = Env::default();
+    let contract_id = env.register(RefundContract, ());
+    let client = RefundContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    client.process_refund(&token_id, &sender, &recipient, &100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_security_refund_negative_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(RefundContract, ());
+    let client = RefundContractClient::new(&env, &contract_id);
+    let token_admin = Address::generate(&env);
+    let stellar_asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_id = stellar_asset.address();
+    let seller = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    client.process_refund(&token_id, &seller, &buyer, &-100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_security_dispute_negative_amount() {
+    let env = Env::default();
+    let contract_id = env.register(DisputeContract, ());
+    let client = DisputeContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbitrator = Address::generate(&env);
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_address = token_contract.address();
+    client.resolve_dispute(
+        &token_address,
+        &arbitrator,
+        &buyer,
+        &seller,
+        &-500,
+        &DisputeDecision::RefundBuyer,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Unauthorized function call for address")]
+fn test_security_initialize_without_auth() {
+    let env = Env::default();
+    let contract_id = env.register(PaymentContract, ());
+    let client = PaymentContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn test_security_transfer_admin_not_initialized() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(PaymentContract, ());
+    let client = PaymentContractClient::new(&env, &contract_id);
+    let new_admin = Address::generate(&env);
+    client.transfer_admin(&new_admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_security_dispute_zero_amount() {
+    let env = Env::default();
+    let contract_id = env.register(DisputeContract, ());
+    let client = DisputeContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbitrator = Address::generate(&env);
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_address = token_contract.address();
+    client.resolve_dispute(
+        &token_address,
+        &arbitrator,
+        &buyer,
+        &seller,
+        &0,
+        &DisputeDecision::RefundBuyer,
+    );
+}
+
