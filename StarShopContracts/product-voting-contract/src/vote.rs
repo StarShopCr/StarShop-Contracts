@@ -86,10 +86,7 @@ impl VoteManager {
 
     pub fn get_product(env: &Env, product_id: Symbol) -> Option<Product> {
         let products: Map<Symbol, Product> =
-            match env.storage().instance().get(&symbol_short!("products")) {
-                Some(p) => p,
-                None => return None, // Handle case where no products are available
-            };
+            env.storage().instance().get(&symbol_short!("products"))?;
         products.get(product_id)
     }
 }
