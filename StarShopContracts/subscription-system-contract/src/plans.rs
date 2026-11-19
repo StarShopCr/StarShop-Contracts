@@ -32,10 +32,17 @@ pub fn create_plan(
     version: u32,
     tier: Symbol,
 ) {
-    // Reading from storage
-    let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
-
-    assert_eq!(stored_admin, admin, "only admin can create plans");
+    // Ensure admin is set – if not, set it to the caller (first admin)
+    let stored_admin: Option<Address> = env.storage().instance().get(&DataKey::Admin);
+    match stored_admin {
+        Some(ref stored) => {
+            assert_eq!(stored, &admin, "only admin can create plans");
+        }
+        None => {
+            // First time initialization
+            env.storage().instance().set(&DataKey::Admin, &admin);
+        }
+    }
 
     // Validate input
     assert!(duration > 0, "duration must be > 0");
@@ -81,7 +88,11 @@ pub fn update_plan(
     version: u32,
     tier: Symbol,
 ) {
-    let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+    let stored_admin: Address = env
+        .storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .expect("admin not set");
     assert_eq!(stored_admin, admin, "only admin can update plans");
 
     if !env
@@ -110,7 +121,11 @@ pub fn update_plan(
 
 /// Admin can deactivate a plan
 pub fn disable_plan(env: &Env, admin: Address, plan_id: Symbol) {
-    let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+    let stored_admin: Address = env
+        .storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .expect("admin not set");
     assert_eq!(stored_admin, admin, "only admin can disable plans");
 
     let mut plan: Plan = env
@@ -121,4 +136,4 @@ pub fn disable_plan(env: &Env, admin: Address, plan_id: Symbol) {
 
     plan.active = false;
     env.storage().instance().set(&DataKey::Plan(plan_id), &plan);
-}
+}
